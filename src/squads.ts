@@ -2,6 +2,7 @@ import * as T from 'three'
 import { Penguin, type PenguinSave } from './penguin'
 import { Seal } from './seal'
 import { Mammoth } from './mammoth'
+import { SaberTooth } from './saber-tooth'
 import { RestActivities } from './rest'
 import { type Snowfield, type SnowParticles } from './snow'
 
@@ -16,6 +17,7 @@ const NPC_FOLLOW = 2.75 * WALK_SCALE
 const SOLO_SPAWN = 1 / 5
 const SEAL_SPAWN = 1 / 100
 const MAMMOTH_SPAWN = 1 / 1000
+const SABER_TOOTH_SPAWN = 2 / 1000
 const SQUAD_SPAWN = 1 / 8
 const INCIDENT_CHANCE = .042
 const PLAYER_INCIDENT_SAMPLE = 7
@@ -135,6 +137,7 @@ export class Colonies {
 
   private add(x: number, z: number, status: Penguin['status'], player = false, seed?: number, species: Penguin['species'] = 'penguin') {
     const penguin = species === 'mammoth' ? new Mammoth(this.scene, x, z, status, seed)
+      : species === 'saber-tooth' ? new SaberTooth(this.scene, x, z, status, seed)
       : species === 'seal' ? new Seal(this.scene, x, z, status, seed)
       : new Penguin(this.scene, x, z, status, player, seed)
     this.penguins.add(penguin)
@@ -214,6 +217,7 @@ export class Colonies {
           solo.protectedUntil = time + 5
           this.party.members.push(solo)
           this.notify(solo.species === 'mammoth' ? '長毛象加入了散步隊伍。'
+            : solo.species === 'saber-tooth' ? '劍齒虎加入了散步隊伍。'
             : solo.species === 'seal' ? '海豹加入了散步隊伍。' : '又一位夥伴加入了散步隊伍。', true)
         }
       } else {
@@ -224,7 +228,7 @@ export class Colonies {
     }
     this.rest.update(this.party.members, dt, time, moving)
     for (const squad of [...this.squads]) this.updateSquad(squad, dt, time)
-    this.keepMammothsClear()
+    this.keepLargeAnimalsClear()
     this.rollIncidents(dt, time)
   }
 
@@ -242,6 +246,9 @@ export class Colonies {
         const pz = z * 20 - this.snow.offset.y
         if (Math.random() < MAMMOTH_SPAWN) {
           this.solo(px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6, time, 'mammoth')
+        }
+        if (Math.random() < SABER_TOOTH_SPAWN) {
+          this.solo(px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6, time, 'saber-tooth')
         }
         if (Math.random() < SEAL_SPAWN) {
           this.solo(px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6, time, 'seal')
@@ -277,16 +284,16 @@ export class Colonies {
     p.dispose(this.scene)
   }
 
-  private keepMammothsClear() {
-    for (const mammoth of this.penguins) {
-      if (mammoth.species !== 'mammoth') continue
+  private keepLargeAnimalsClear() {
+    for (const large of this.penguins) {
+      if (large.species !== 'mammoth' && large.species !== 'saber-tooth') continue
       for (const animal of this.penguins) {
-        if (animal === mammoth) continue
-        const distance = mammoth.formationRadius + animal.formationRadius + .08
-        separation.subVectors(animal.position, mammoth.position)
+        if (animal === large) continue
+        const distance = large.formationRadius + animal.formationRadius + .08
+        separation.subVectors(animal.position, large.position)
         if (separation.lengthSq() >= distance ** 2) continue
-        if (separation.lengthSq() < 1e-8) separation.set(Math.sin(mammoth.angle), Math.cos(mammoth.angle)).negate()
-        animal.position.copy(mammoth.position).add(separation.setLength(distance))
+        if (separation.lengthSq() < 1e-8) separation.set(Math.sin(large.angle), Math.cos(large.angle)).negate()
+        animal.position.copy(large.position).add(separation.setLength(distance))
         animal.track()
       }
     }

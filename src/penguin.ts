@@ -102,7 +102,7 @@ export class Penguin {
   private nextStroke = 0
 
   constructor(scene: T.Scene, x: number, z: number, status: Status, player = false,
-    protected seed = Math.floor(Math.random() * 0x100000000), readonly species: 'penguin' | 'seal' | 'mammoth' = 'penguin') {
+    protected seed = Math.floor(Math.random() * 0x100000000), readonly species: 'penguin' | 'seal' | 'mammoth' | 'saber-tooth' = 'penguin') {
     const appearance = random(seed)
     const chick = !player && species === 'penguin' && appearance() < .43
     this.status = status
