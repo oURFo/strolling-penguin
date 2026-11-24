@@ -222,7 +222,7 @@ export class Colonies {
       }
       solo.track()
     }
-    this.rest.update(this.party.members, dt, time, moving, this.frustum)
+    this.rest.update(this.party.members, dt, time, moving)
     for (const squad of [...this.squads]) this.updateSquad(squad, dt, time)
     this.keepMammothsClear()
     this.rollIncidents(dt, time)
