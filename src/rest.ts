@@ -104,6 +104,7 @@ export class RestActivities {
       return {anchor, until: time + 4 + Math.random() * 4, offset: new T.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(distance)}
     }
     const pose = p.species === 'penguin' && kind < .91 ? soloPoses[Math.floor(Math.random() * soloPoses.length)] : undefined
+    if (pose === 'tumble' && this.snow.isWater(p.position.x, p.position.y)) return {anchor, until: time + 1.2, pose: 'dream'}
     if (pose === 'tumble') this.snowPuff(p, 12, 1.12)
     return {anchor, until: time + (pose === 'tumble' ? 1.2 : 1.25 + Math.random() * 1.8), pose}
   }
@@ -158,6 +159,6 @@ export class RestActivities {
 
   private snowPuff(p: Penguin, count: number, force: number) {
     const {x, y: z} = p.position
-    this.flakes.burst(x, this.snow.height(x, z) + .10, z, count, force)
+    this.flakes.burst(x, this.snow.surface(x, z) + .10, z, count, force)
   }
 }

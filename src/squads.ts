@@ -337,7 +337,8 @@ export class Colonies {
       if (squad.recallable && this.splitAfterTimeout(squad, event, time)) return
       if (event.kind === 'trip') {
         for (const fall of event.falls) {
-          if (fall.delay <= event.elapsed && fall.member.status === 'follow') this.fall(fall.member)
+          const p = fall.member
+          if (fall.delay <= event.elapsed && p.status === 'follow' && !this.snow.isWater(p.position.x, p.position.y)) this.fall(p)
         }
       } else if (event.kind === 'stray' && (!event.target || !this.penguins.has(event.target) || members.includes(event.target))) {
         if (squad.recallable) this.rejoin(squad, time)
@@ -438,7 +439,7 @@ export class Colonies {
     const {squad, actor} = successes[Math.floor(Math.random() * successes.length)]
     const roll = Math.random()
     const target = roll > .59 ? this.strayTarget(squad, actor) : undefined
-    const kind = target ? 'stray' : roll < .34 ? 'trip' : 'dream'
+    const kind = target ? 'stray' : roll < .34 && !this.snow.isWater(actor.position.x, actor.position.y) ? 'trip' : 'dream'
     const falls: Incident['falls'] = []
     if (kind === 'trip') {
       let delay = 0
@@ -468,7 +469,7 @@ export class Colonies {
       const d = actor.position.distanceToSquared(candidate.position)
       if (d < 3.7 ** 2 || d > distance) continue
       const {x, y: z} = candidate.position
-      this.testPoint.set(x, this.snow.height(x, z) + .65, z)
+      this.testPoint.set(x, this.snow.surface(x, z) + .65, z)
       if (!this.frustum.containsPoint(this.testPoint)) continue
       distance = d
       best = candidate

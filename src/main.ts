@@ -168,7 +168,7 @@ function boot() {
     const {x, y: z} = player.position
     const originX = x + Math.sin(player.angle) * .34
     const originZ = z + Math.cos(player.angle) * .34
-    wave.position.set(originX, snow.height(x, z) + .68, originZ)
+    wave.position.set(originX, snow.surface(x, z) + .68, originZ)
     echo.position.copy(wave.position)
     if (colonies.rescue(time)) notify('叫回夥伴了，一起繼續散步。')
     audio.play('honk')
@@ -247,7 +247,7 @@ function boot() {
 
   function updateCamera(dt: number) {
     const {x, y: z} = player.position
-    const y = snow.height(x, z)
+    const y = snow.surface(x, z)
     view.set(x, y + .26, z - 2.4)
     const t = initialized ? 1 - Math.exp(-dt * 5.8) : 1
     focus.lerp(view, t)
@@ -337,7 +337,8 @@ function boot() {
     colonies.update(dt, time, movement, camera)
     shiftWorld()
     const {x, y: z} = player.position
-    const ground = snow.height(x, z)
+    const ground = snow.surface(x, z)
+    snow.animate(time)
     snow.update(x, z)
     updateCamera(dt)
     for (const p of colonies.penguins) {

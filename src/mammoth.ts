@@ -92,7 +92,8 @@ export class Mammoth extends Penguin {
     const step = super.animate(dt, time, snow, prints, particles)
     const pace = Math.min(1, this.speed / .65)
     const gait = Math.sin(this.phase) * pace
-    this.frame.rotation.z = this.body.rotation.x * .49 + gait * .035
+    this.frame.rotation.z = (this.swimming ? 0 : this.body.rotation.x * .49) + gait * .035
+    this.frame.rotation.x = this.swimming ? -.12 + gait * .055 : 0
     this.face.rotation.y = Math.sin(time * .63 + this.angle) * (1 - pace) * .19
     this.trunk.rotation.z = gait * .20 + Math.sin(time * 1.4) * .075
     this.legs.forEach((leg, i) => {

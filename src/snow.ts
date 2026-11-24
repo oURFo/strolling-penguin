@@ -12,8 +12,10 @@ const noise = createNoise2D(random(3425))
 const CHUNK = 36
 const GRID = 24
 const STEP = CHUNK / GRID
+export const SEA_LEVEL = -2
 const snowColor = new T.Color()
 const frostColor = new T.Color(0xb7d7ea)
+const seabedColor = new T.Color(0x527f95)
 const normal = new T.Vector3()
 const up = new T.Vector3(0, 1, 0)
 const yaw = new T.Quaternion()
@@ -27,6 +29,8 @@ export class Snowfield {
   private chunks = new Map<string, T.Group>()
   private free: T.Group[] = []
   private material: T.MeshStandardMaterial
+  private seaMaterial = new T.MeshBasicMaterial({transparent: true, opacity: .60, depthWrite: false})
+  private seaTime = {value: 0}
   private crystal = winterSprite('crystals')
   private driftSprite = winterSprite('drift')
   private drift = new T.SphereGeometry(1, 14, 9)
@@ -46,11 +50,53 @@ export class Snowfield {
     this.material = new T.MeshStandardMaterial({
       color: 0xffffff, map: albedo, normalMap, roughnessMap, normalScale: new T.Vector2(.2, .2), roughness: .9, vertexColors: true
     })
+    this.seaMaterial.onBeforeCompile = shader => {
+      shader.uniforms.seaTime = this.seaTime
+      shader.vertexShader = 'varying vec2 vSea; varying float vDepth;\n' + shader.vertexShader
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
+        #include <begin_vertex>
+        vSea = uv * 7.0;
+        vDepth = ${SEA_LEVEL.toFixed(1)} - position.y;
+        transformed.y = ${SEA_LEVEL.toFixed(1)};
+      `)
+      shader.fragmentShader = 'uniform float seaTime; varying vec2 vSea; varying float vDepth;\n' + shader.fragmentShader
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+        #include <color_fragment>
+        if (vDepth <= 0.0) discard;
+        float moving = sin(dot(vSea, vec2(0.82, 1.74)) - seaTime * 1.8
+          + sin(vSea.x * 0.42 + seaTime * 0.42) * 1.22);
+        float crossWave = sin(dot(vSea, vec2(-1.21, 0.49)) + seaTime * 1.24);
+        vec3 deep = vec3(0.105, 0.34, 0.53);
+        vec3 shallow = vec3(0.34, 0.66, 0.77);
+        vec3 sea = mix(shallow, deep, smoothstep(0.0, 2.4, vDepth));
+        sea += (moving * 0.019 + crossWave * 0.014);
+        float ripple = smoothstep(0.88, 1.0, moving) * smoothstep(0.08, 0.8, crossWave);
+        sea = mix(sea, vec3(0.68, 0.87, 0.94), ripple * 0.34);
+        float foam = 1.0 - smoothstep(0.04, 0.26, vDepth + moving * 0.035);
+        diffuseColor.rgb = mix(sea, vec3(0.84, 0.94, 0.98), foam * 0.63);
+        diffuseColor.a *= clamp(0.68 + foam * 0.26 + ripple * 0.16, 0.0, 1.0);
+      `)
+    }
   }
 
   private elevation(x: number, z: number) {
-    return noise(x * .025, z * .025) * .96 + noise(x * .065, z * .065) * .23
+    const ground = noise(x * .025, z * .025) * .96 + noise(x * .065, z * .065) * .23
       + noise(x * .008 + 20, z * .008) * .55
+    const coast = noise(x * .021 + 106, z * .021 - 73) * .76 + noise(x * .008 - 64, z * .008 + 19) * .32
+    const ocean = T.MathUtils.smoothstep(coast, .12, .41) * T.MathUtils.smoothstep(Math.hypot(x, z), 13, 24)
+    return ground - 4.7 * ocean
+  }
+
+  surface(x: number, z: number) {
+    return Math.max(SEA_LEVEL, this.height(x, z))
+  }
+
+  isWater(x: number, z: number) {
+    return this.height(x, z) < SEA_LEVEL
+  }
+
+  animate(time: number) {
+    this.seaTime.value = time
   }
 
   height(x: number, z: number) {
@@ -110,6 +156,7 @@ export class Snowfield {
     geometry.setAttribute('color', new T.BufferAttribute(new Float32Array((GRID + 1) ** 2 * 3), 3))
     const mesh = new T.Mesh(geometry, this.material)
     group.add(mesh)
+    group.add(new T.Mesh(geometry, this.seaMaterial))
     group.add(new T.Sprite(this.crystal), new T.Sprite(this.driftSprite))
     for (let i = 0; i < 5; i++) group.add(new T.Mesh(this.drift, this.driftMaterial))
     this.scene.add(group)
@@ -126,29 +173,34 @@ export class Snowfield {
     const colors = geometry.attributes.color
     const normals = geometry.attributes.normal
     const uv = geometry.attributes.uv
+    let underwater = false
     for (let i = 0; i < vertices.count; i++) {
       const x = wx + vertices.getX(i)
       const z = wz + vertices.getZ(i)
-      vertices.setY(i, this.elevation(x, z))
+      const elevation = this.elevation(x, z)
+      vertices.setY(i, elevation)
+      underwater ||= elevation < SEA_LEVEL
       normal.set(this.elevation(x - .2, z) - this.elevation(x + .2, z), .4,
         this.elevation(x, z - .2) - this.elevation(x, z + .2)).normalize()
       normals.setXYZ(i, normal.x, normal.y, normal.z)
       const frost = noise(x * .047 + 80, z * .047) * .5 + .5
       snowColor.set(0xfafaff).lerp(frostColor, frost ** 2 * .67)
+      snowColor.lerp(seabedColor, T.MathUtils.smoothstep(SEA_LEVEL - elevation, .08, 2.4) * .82)
       colors.setXYZ(i, snowColor.r, snowColor.g, snowColor.b)
       uv.setXY(i, x / 7, z / 7)
     }
     vertices.needsUpdate = colors.needsUpdate = normals.needsUpdate = uv.needsUpdate = true
     geometry.computeBoundingSphere()
+    group.children[1].visible = underwater
     const rng = random((gx * 73856093) ^ (gz * 19349663))
-    group.children.slice(1).forEach((item, i) => {
+    group.children.slice(2).forEach((item, i) => {
       const sprite = i < 2
       const x = i === 0 ? 6 + rng() * 24 : rng() * 34 + 1
       const z = i === 0 ? 6 + rng() * 24 : rng() * 34 + 1
       const height = i === 0 ? 1.8 + rng() * .7 : i === 1 ? .62 : .14 + rng() * .22
       const width = i === 0 ? height * .97 : 1.2 + rng() * 2
-      item.visible = Math.hypot(wx + x, wz + z) >= 5
       const ground = this.height(group.position.x + x, group.position.z + z)
+      item.visible = Math.hypot(wx + x, wz + z) >= 5 && ground > SEA_LEVEL + .26
       item.position.set(x, ground + (sprite ? height * .40 : -.07), z)
       item.scale.set(width, height, width * (.6 + rng() * .5))
       if (!sprite) item.rotation.y = rng() * Math.PI

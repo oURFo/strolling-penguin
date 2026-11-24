@@ -61,7 +61,7 @@ export class Seal extends Penguin {
     const stroke = Math.sin(this.phase) * Math.min(1, this.speed / .65)
     const fallen = this.status === 'trip'
     this.sealBody.scale.y = 1 + breath * .045
-    this.sealBody.rotation.z = this.body.rotation.x * .62 + stroke * .08
+    this.sealBody.rotation.z = (this.swimming ? 0 : this.body.rotation.x * .62) + stroke * .08
     this.sealHead.rotation.set(.06 * breath + stroke * .09, Math.sin(time * .58 + this.idlePhase) * (this.speed > .06 ? .11 : .34), .035 * breath)
     this.flippers.forEach((fin, i) => {
       const side = i ? 1 : -1

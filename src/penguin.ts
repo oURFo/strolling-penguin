@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { type Snowfield, type SnowParticles, type Footprints, random, softDot } from './snow'
+import { type Snowfield, type SnowParticles, type Footprints, random, SEA_LEVEL, softDot } from './snow'
 
 export type Status = 'solo' | 'leader' | 'follow' | 'trip' | 'dream' | 'stray'
 export type RestPose = 'tumble' | 'dream' | 'hop' | 'chat'
@@ -76,6 +76,7 @@ export class Penguin {
   height: number
   phase = 0
   speed = 0
+  swimming = false
   restPose?: RestPose
   recruit = 0
   joy = 0
@@ -94,6 +95,11 @@ export class Penguin {
   private idleYaw = 0
   private idlePitch = 0
   private blinkIn = 1 + Math.random() * 4
+  private waterKnown = false
+  private shoreTime = 0
+  private shoreHeight = 0
+  private diveDepth = 0
+  private nextStroke = 0
 
   constructor(scene: T.Scene, x: number, z: number, status: Status, player = false,
     protected seed = Math.floor(Math.random() * 0x100000000), readonly species: 'penguin' | 'seal' | 'mammoth' = 'penguin') {
@@ -202,12 +208,20 @@ export class Penguin {
   animate(dt: number, time: number, snow: Snowfield, prints: Footprints, particles: SnowParticles) {
     const {x, y: z} = this.position
     const ground = snow.height(x, z)
-    const stumble = this.status === 'trip' || this.restPose === 'tumble'
+    const water = ground < SEA_LEVEL
+    if (this.waterKnown && water !== this.swimming) {
+      this.shoreHeight = this.root.position.y
+      this.shoreTime = .58
+      particles.burst(x, SEA_LEVEL + .07, z, water ? 23 : 14, water ? 1.75 : 1.28)
+    }
+    this.waterKnown = true
+    this.swimming = water
+    const stumble = !water && (this.status === 'trip' || this.restPose === 'tumble')
     const dream = this.status === 'dream' || this.restPose === 'dream'
     const chatting = this.restPose === 'chat'
     this.joy = Math.max(0, this.joy - dt)
     this.honk = Math.max(0, this.honk - dt)
-    this.tilt = T.MathUtils.lerp(this.tilt, stumble ? 1.39 : 0, Math.min(1, dt * 11))
+    this.tilt = T.MathUtils.lerp(this.tilt, stumble ? 1.39 : water ? 1.10 : 0, Math.min(1, dt * 9))
     const stride = this.chick ? .29 : .41
     const moving = !stumble && this.speed > .065
     const walk = moving ? T.MathUtils.clamp(this.speed / 2.4, .64, 1) : 0
@@ -231,15 +245,28 @@ export class Penguin {
     const recoveryHop = this.joy > 0 ? Math.sin(this.joy / .72 * Math.PI) * .23 : 0
     const bounce = Math.abs(Math.sin(this.phase)) * this.gait * .06
       + (this.restPose === 'hop' ? Math.abs(Math.sin(time * 8 + this.idleSeed)) ** 2 * .18 : 0)
-    this.root.position.set(x, ground + recoveryHop + Math.sin(this.tilt) * .32 + bounce, z)
-    this.root.quaternion.setFromUnitVectors(up, snow.slope(x, z, slope))
+    const floatDepth = this.height * (this.species === 'penguin' ? .22 : this.species === 'seal' ? .23 : .46)
+    const strokeDepth = this.height * (this.species === 'penguin' ? .33 : .67) + .38
+    const dive = moving && water ? strokeDepth * (.78 + Math.sin(time * 2.9 + this.idleSeed) * .22) : 0
+    this.diveDepth = water ? T.MathUtils.lerp(this.diveDepth, dive, 1 - Math.exp(-dt * 4.5)) : 0
+    const mediumHeight = water ? Math.max(ground + .08, SEA_LEVEL - floatDepth - this.diveDepth)
+      + Math.sin(time * 4.1 + this.idleSeed) * .048
+      : ground + Math.sin(this.tilt) * .32
+    this.shoreTime = Math.max(0, this.shoreTime - dt)
+    const crossing = 1 - this.shoreTime / .58
+    const y = T.MathUtils.lerp(this.shoreHeight, mediumHeight, T.MathUtils.smoothstep(crossing, 0, 1))
+      + Math.sin(crossing * Math.PI) * (water ? .45 : .56)
+    this.root.position.set(x, y + recoveryHop + (water ? bounce * .25 : bounce), z)
+    const groundNormal = water ? up : snow.slope(x, z, slope)
+    this.root.quaternion.setFromUnitVectors(up, groundNormal)
       .multiply(heading.setFromAxisAngle(up, this.angle))
     this.shadow.position.set(x, ground + .02, z)
-    this.shadow.quaternion.setFromUnitVectors(up, slope)
+    this.shadow.visible = !water
+    this.shadow.quaternion.setFromUnitVectors(up, groundNormal)
     if (this.species !== 'penguin') this.shadow.quaternion.multiply(heading)
     const sway = Math.sin(this.phase) * this.gait
     this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
-    const pitch = dream ? -.22 + Math.sin(time * 2) * .13 : this.honk > 0 ? -.24
+    const pitch = this.honk > 0 ? -.24 : water ? -.47 + Math.sin(this.phase) * .09 : dream ? -.22 + Math.sin(time * 2) * .13
       : chatting ? Math.sin(time * 8 + this.idleSeed) * .13 : idle ? this.idlePitch : -.035
     const yaw = dream ? Math.sin(time * 2.1) * .45 : idle && !chatting ? this.idleYaw : 0
     this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0), blend)
@@ -258,11 +285,20 @@ export class Penguin {
       const step = Math.sin(this.phase + i * Math.PI) * this.gait
       mesh.position.y = .071 + Math.max(0, step) * .17
       mesh.position.z = .094 + step * .13
-      this.wings[i].rotation.x = -step * .34
-      const playFlap = this.restPose === 'hop' ? .31 + Math.sin(time * 15) * .24 : 0
+      const paddle = water ? Math.sin(time * (moving ? 11 : 4) + i * Math.PI) * (moving ? .81 : .25) : 0
+      this.wings[i].rotation.x = water ? paddle : -step * .34
+      const playFlap = water ? .25 + paddle * .48 : this.restPose === 'hop' ? .31 + Math.sin(time * 15) * .24 : 0
       this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : sway * .2 + playFlap + (idle ? breath * .035 : 0)))
     })
-    if (!moving) return
+    if (water) {
+      if (moving && time >= this.nextStroke) {
+        this.nextStroke = time + .20 + Math.random() * .10
+        particles.burst(x - Math.sin(this.angle) * this.radius, SEA_LEVEL + .06,
+          z - Math.cos(this.angle) * this.radius, 4, .65)
+      }
+      return
+    }
+    if (!moving || this.shoreTime > 0) return
     this.distance += this.speed * dt
     if (this.distance < stride) return
     this.distance %= stride
