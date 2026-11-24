@@ -20,7 +20,7 @@ const SQUAD_SPAWN = 1 / 8
 const INCIDENT_CHANCE = .042
 const PLAYER_INCIDENT_SAMPLE = 7
 const INCIDENT_MARKER_DURATION = 2
-const RECOVERY_TIMEOUT = 10
+const RECOVERY_TIMEOUT = 30
 const VISIT_CHANCE = .12
 const VISIT_RADIUS = 18
 const VISIT_DURATION = 22
@@ -453,8 +453,8 @@ export class Colonies {
     const incident = {actor, kind, target, falls, elapsed: 0} satisfies Incident
     if (squad === this.party) {
       this.detach(incident)
-      this.notify(kind === 'trip' ? '有夥伴跌倒了，請在 10 秒內回去呼喚。'
-        : kind === 'dream' ? '有夥伴停下來發呆了，請在 10 秒內回去呼喚。' : '有夥伴拐往別處了，趕快追上牠！')
+      this.notify(kind === 'trip' ? `有夥伴跌倒了，請在 ${RECOVERY_TIMEOUT} 秒內回去呼喚。`
+        : kind === 'dream' ? `有夥伴停下來發呆了，請在 ${RECOVERY_TIMEOUT} 秒內回去呼喚。` : '有夥伴拐往別處了，趕快追上牠！')
     } else {
       squad.incident = incident
     }
