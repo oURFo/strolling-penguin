@@ -68,6 +68,12 @@ export class Penguin {
   private shadow: T.Mesh
   private tilt = 0
   private chick: boolean
+  private gait = 0
+  private idleSeed = Math.random() * TAU
+  private idleLookIn = .5 + Math.random() * 2
+  private idleYaw = 0
+  private idlePitch = 0
+  private blinkIn = 1 + Math.random() * 4
 
   constructor(scene: T.Scene, x: number, z: number, status: Status, player = false, chick = !player && Math.random() < .43) {
     this.status = status
@@ -153,34 +159,58 @@ export class Penguin {
     this.joy = Math.max(0, this.joy - dt)
     this.honk = Math.max(0, this.honk - dt)
     this.tilt = T.MathUtils.lerp(this.tilt, stumble ? 1.39 : 0, Math.min(1, dt * 11))
-    const walk = Math.min(1, this.speed / (this.chick ? 1.6 : 2.3))
-    this.phase = (this.phase + dt * (this.chick ? 16 : 11) * walk) % TAU
+    const stride = this.chick ? .29 : .41
+    const moving = !stumble && this.speed > .065
+    const walk = moving ? T.MathUtils.clamp(this.speed / 2.4, .64, 1) : 0
+    const blend = 1 - Math.exp(-dt * 13)
+    this.gait = T.MathUtils.lerp(this.gait, walk, blend)
+    this.phase = (this.phase + this.speed * dt * Math.PI / stride) % TAU
+    const idle = !moving && !stumble && !dream && this.honk === 0
+    const breath = Math.sin(time * 2.8 + this.idleSeed)
+    if (idle) {
+      this.idleLookIn -= dt
+      if (this.idleLookIn <= 0) {
+        this.idleLookIn = 1.05 + Math.random() * 1.65
+        const look = Math.random()
+        this.idleYaw = look < .36 ? -.72 : look < .72 ? .72 : (Math.random() - .5) * .3
+        this.idlePitch = look < .72 ? -.06 + Math.random() * .18 : -.32
+      }
+    }
+    this.blinkIn -= dt
+    if (this.blinkIn < -.15) this.blinkIn = 2 + Math.random() * 3.8
+    const blink = this.blinkIn < 0 ? Math.sin(-this.blinkIn / .15 * Math.PI) : 0
     const recoveryHop = this.joy > 0 ? Math.sin(this.joy / .72 * Math.PI) * .23 : 0
-    this.root.position.set(x, ground + recoveryHop + Math.sin(this.tilt) * .32, z)
+    const bounce = Math.abs(Math.sin(this.phase)) * this.gait * .06
+    this.root.position.set(x, ground + recoveryHop + Math.sin(this.tilt) * .32 + bounce, z)
     this.root.quaternion.setFromUnitVectors(up, snow.slope(x, z, slope))
       .multiply(heading.setFromAxisAngle(up, this.angle))
     this.shadow.position.set(x, ground + .02, z)
     this.shadow.quaternion.setFromUnitVectors(up, slope)
-    this.body.rotation.set(this.tilt, 0, Math.sin(this.phase) * walk * .11)
-    this.head.rotation.set(dream ? -.22 + Math.sin(time * 2) * .13 : this.honk > 0 ? -.24 : 0,
-      dream ? Math.sin(time * 2.1) * .45 : 0, 0)
+    const sway = Math.sin(this.phase) * this.gait
+    this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
+    const pitch = dream ? -.22 + Math.sin(time * 2) * .13 : this.honk > 0 ? -.24 : idle ? this.idlePitch : -.035
+    const yaw = dream ? Math.sin(time * 2.1) * .45 : idle ? this.idleYaw : 0
+    this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0), blend)
+    this.head.rotation.y = T.MathUtils.lerp(this.head.rotation.y, yaw, blend * .65)
+    this.head.rotation.z = T.MathUtils.lerp(this.head.rotation.z, idle ? yaw * -.11 : -sway * .07, blend)
     this.beak.visible = this.honk === 0
     this.trumpet.visible = this.honk > 0
     this.trumpet.scale.z = 1 + Math.sin(this.honk / .6 * Math.PI) * .57
     this.eyes.forEach((eye, i) => {
-      eye.scale.y = dream ? .018 : this.joy > 0 ? .022 : this.status === 'stray' ? .055 : .046
+      const open = dream ? .018 : this.joy > 0 ? .022 : this.status === 'stray' ? .055 : .046
+      eye.scale.y = T.MathUtils.lerp(open, .004, blink)
       eye.rotation.z = dream || stumble ? (i === 0 ? .36 : -.36) : 0
-      this.pupils[i].visible = !dream && !stumble
+      this.pupils[i].visible = !dream && !stumble && blink < .45
     })
     this.feet.forEach((mesh, i) => {
-      const step = Math.sin(this.phase + i * Math.PI) * walk
-      mesh.position.y = .071 + Math.max(0, step) * .115
-      mesh.position.z = .094 + step * .084
-      this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : walk * Math.sin(this.phase) * .17))
+      const step = Math.sin(this.phase + i * Math.PI) * this.gait
+      mesh.position.y = .071 + Math.max(0, step) * .17
+      mesh.position.z = .094 + step * .13
+      this.wings[i].rotation.x = -step * .34
+      this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : sway * .2 + (idle ? breath * .035 : 0)))
     })
-    if (stumble || walk === 0) return
+    if (!moving) return
     this.distance += this.speed * dt
-    const stride = this.chick ? .29 : .41
     if (this.distance < stride) return
     this.distance %= stride
     this.side *= -1

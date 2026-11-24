@@ -63,9 +63,9 @@ export class Colonies {
     return penguin
   }
 
-  private solo(x: number, z: number) {
+  private solo(x: number, z: number, time = 0) {
     const penguin = this.add(x, z, 'solo')
-    penguin.nextTurn = 3 + Math.random() * 3
+    penguin.nextTurn = time + 1.5 + Math.random() * 5
     this.solos.add(penguin)
   }
 
@@ -85,13 +85,26 @@ export class Colonies {
     if (time >= p.nextTurn) {
       p.nextTurn = time + 3 + Math.random() * 5
       p.target.copy(p.position)
-      if (p.status !== 'solo' || Math.random() > .38) {
-        const angle = p.angle + (Math.random() - .5) * 2.8
-        p.target.x += Math.sin(angle) * 13
-        p.target.y += Math.cos(angle) * 13
-      }
+      const angle = p.angle + (Math.random() - .5) * 2.8
+      p.target.x += Math.sin(angle) * 13
+      p.target.y += Math.cos(angle) * 13
     }
     p.move(p.target, speed, dt)
+  }
+
+  private strollAlone(p: Penguin, dt: number, time: number) {
+    if (p.position.distanceToSquared(p.target) > .0001) {
+      p.move(p.target, SOLO_WALK, dt)
+      if (p.position.distanceToSquared(p.target) <= .0001) {
+        p.target.copy(p.position)
+        p.nextTurn = time + 2.5 + Math.random() * 6.5
+      }
+      return
+    }
+    if (time < p.nextTurn) return
+    const angle = p.angle + (Math.random() - .5) * Math.PI * 1.6
+    const distance = 1.25 + Math.random() * 2.25
+    p.target.set(p.position.x + Math.sin(angle) * distance, p.position.y + Math.cos(angle) * distance)
   }
 
   update(dt: number, time: number, input: T.Vector2, camera: T.Camera) {
@@ -100,11 +113,15 @@ export class Colonies {
     desired.copy(player.position).addScaledVector(input, WALK * dt)
     player.move(desired, WALK * Math.min(1, input.length()), dt)
     player.track()
-    this.populate()
+    this.populate(time)
     this.projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
     this.frustum.setFromProjectionMatrix(this.projection)
     for (const solo of this.solos) {
       if (solo.position.distanceToSquared(player.position) <= RECRUIT ** 2) {
+        if (solo.recruit === 0) {
+          solo.target.copy(solo.position)
+          solo.nextTurn = time + 2.5 + Math.random() * 3
+        }
         solo.recruit += dt
         if (solo.recruit >= 1) {
           this.solos.delete(solo)
@@ -117,14 +134,14 @@ export class Colonies {
         }
       } else {
         solo.recruit = 0
-        this.roam(solo, dt, time, SOLO_WALK)
+        this.strollAlone(solo, dt, time)
       }
       solo.track()
     }
     for (const squad of [...this.squads]) this.updateSquad(squad, dt, time)
   }
 
-  private populate() {
+  private populate(time: number) {
     const player = this.player.position
     absolute.set(player.x + this.snow.offset.x, player.y + this.snow.offset.y)
     const cx = Math.floor((absolute.x + 10) / 20)
@@ -136,7 +153,7 @@ export class Colonies {
         this.populated.add(key)
         const px = x * 20 - this.snow.offset.x
         const pz = z * 20 - this.snow.offset.y
-        if (Math.random() < SOLO_SPAWN) this.solo(px + Math.random() * 8 - 4, pz + Math.random() * 8 - 4)
+        if (Math.random() < SOLO_SPAWN) this.solo(px + Math.random() * 8 - 4, pz + Math.random() * 8 - 4, time)
         if ((x + 2 * z) % 4 === 0 && Math.random() < SQUAD_SPAWN) {
           this.squad(px - 5, pz + 4, 2 + Math.floor(Math.random() * 7))
         }
