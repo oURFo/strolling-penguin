@@ -22,6 +22,8 @@ export class Seal extends Penguin {
   private flippers: T.Mesh[] = []
   private idlePhase: number
 
+  override get formationRadius() { return 1.58 }
+
   constructor(scene: T.Scene, x: number, z: number, status: Status = 'solo', seed?: number) {
     super(scene, x, z, status, false, seed, 'seal')
     const pose = random(this.seed)

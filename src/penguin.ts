@@ -71,6 +71,7 @@ export class Penguin {
   status: Status
   angle = 0
   radius: number
+  get formationRadius() { return this.radius }
   height: number
   phase = 0
   speed = 0
@@ -93,7 +94,7 @@ export class Penguin {
   private blinkIn = 1 + Math.random() * 4
 
   constructor(scene: T.Scene, x: number, z: number, status: Status, player = false,
-    protected seed = Math.floor(Math.random() * 0x100000000), readonly species: 'penguin' | 'seal' = 'penguin') {
+    protected seed = Math.floor(Math.random() * 0x100000000), readonly species: 'penguin' | 'seal' | 'mammoth' = 'penguin') {
     const appearance = random(seed)
     const chick = !player && species === 'penguin' && appearance() < .43
     this.status = status
@@ -109,7 +110,7 @@ export class Penguin {
     this.shadow.renderOrder = 2
     scene.add(this.root, this.shadow)
     this.route.push(this.position.clone())
-    if (species === 'seal') return
+    if (species !== 'penguin') return
     const palette = chick ? chicks : adults
     const coat = palette[Math.floor(appearance() * palette.length)]
     this.root.add(this.body)
@@ -223,7 +224,7 @@ export class Penguin {
       .multiply(heading.setFromAxisAngle(up, this.angle))
     this.shadow.position.set(x, ground + .02, z)
     this.shadow.quaternion.setFromUnitVectors(up, slope)
-    if (this.species === 'seal') this.shadow.quaternion.multiply(heading)
+    if (this.species !== 'penguin') this.shadow.quaternion.multiply(heading)
     const sway = Math.sin(this.phase) * this.gait
     this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
     const pitch = dream ? -.22 + Math.sin(time * 2) * .13 : this.honk > 0 ? -.24 : idle ? this.idlePitch : -.035

@@ -1,6 +1,7 @@
 import * as T from 'three'
 import { Penguin, type PenguinSave } from './penguin'
 import { Seal } from './seal'
+import { Mammoth } from './mammoth'
 import { type Snowfield, type SnowParticles } from './snow'
 
 const RECRUIT = 2.15
@@ -13,8 +14,10 @@ const PLAYER_FOLLOW = 4.65 * WALK_SCALE
 const NPC_FOLLOW = 2.75 * WALK_SCALE
 const SOLO_SPAWN = 1 / 5
 const SEAL_SPAWN = 1 / 100
+const MAMMOTH_SPAWN = 1 / 1000
 const SQUAD_SPAWN = 1 / 8
 const INCIDENT_CHANCE = .84 / 10
+const PLAYER_INCIDENT_SAMPLE = 7
 const INCIDENT_MARKER_DURATION = 2
 const RECOVERY_TIMEOUT = 10
 const VISIT_CHANCE = .12
@@ -22,6 +25,7 @@ const VISIT_RADIUS = 18
 const VISIT_DURATION = 22
 const desired = new T.Vector2()
 const absolute = new T.Vector2()
+const separation = new T.Vector2()
 
 type Incident = {
   actor: Penguin
@@ -127,7 +131,9 @@ export class Colonies {
   }
 
   private add(x: number, z: number, status: Penguin['status'], player = false, seed?: number, species: Penguin['species'] = 'penguin') {
-    const penguin = species === 'seal' ? new Seal(this.scene, x, z, status, seed) : new Penguin(this.scene, x, z, status, player, seed)
+    const penguin = species === 'mammoth' ? new Mammoth(this.scene, x, z, status, seed)
+      : species === 'seal' ? new Seal(this.scene, x, z, status, seed)
+      : new Penguin(this.scene, x, z, status, player, seed)
     this.penguins.add(penguin)
     return penguin
   }
@@ -186,7 +192,8 @@ export class Colonies {
     this.projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
     this.frustum.setFromProjectionMatrix(this.projection)
     for (const solo of this.solos) {
-      if (solo.position.distanceToSquared(player.position) <= RECRUIT ** 2) {
+      const recruitRange = Math.max(RECRUIT, solo.formationRadius + player.formationRadius + .65)
+      if (solo.position.distanceToSquared(player.position) <= recruitRange ** 2) {
         if (solo.recruit === 0) {
           solo.target.copy(solo.position)
           solo.nextTurn = time + 2.5 + Math.random() * 3
@@ -199,7 +206,8 @@ export class Colonies {
           solo.joy = .72
           solo.protectedUntil = time + 5
           this.party.members.push(solo)
-          this.notify(solo.species === 'seal' ? '海豹加入了散步隊伍。' : '又一位夥伴加入了散步隊伍。', true)
+          this.notify(solo.species === 'mammoth' ? '長毛象加入了散步隊伍。'
+            : solo.species === 'seal' ? '海豹加入了散步隊伍。' : '又一位夥伴加入了散步隊伍。', true)
         }
       } else {
         solo.recruit = 0
@@ -208,6 +216,7 @@ export class Colonies {
       solo.track()
     }
     for (const squad of [...this.squads]) this.updateSquad(squad, dt, time)
+    this.keepMammothsClear()
     this.rollIncidents(dt, time)
   }
 
@@ -223,6 +232,9 @@ export class Colonies {
         this.populated.add(key)
         const px = x * 20 - this.snow.offset.x
         const pz = z * 20 - this.snow.offset.y
+        if (Math.random() < MAMMOTH_SPAWN) {
+          this.solo(px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6, time, 'mammoth')
+        }
         if (Math.random() < SEAL_SPAWN) {
           this.solo(px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6, time, 'seal')
         }
@@ -255,6 +267,21 @@ export class Colonies {
   private remove(p: Penguin) {
     this.penguins.delete(p)
     p.dispose(this.scene)
+  }
+
+  private keepMammothsClear() {
+    for (const mammoth of this.penguins) {
+      if (mammoth.species !== 'mammoth') continue
+      for (const animal of this.penguins) {
+        if (animal === mammoth) continue
+        const distance = mammoth.formationRadius + animal.formationRadius + .08
+        separation.subVectors(animal.position, mammoth.position)
+        if (separation.lengthSq() >= distance ** 2) continue
+        if (separation.lengthSq() < 1e-8) separation.set(Math.sin(mammoth.angle), Math.cos(mammoth.angle)).negate()
+        animal.position.copy(mammoth.position).add(separation.setLength(distance))
+        animal.track()
+      }
+    }
   }
 
   private leadNpcSquad(squad: Squad, dt: number, time: number) {
@@ -325,7 +352,7 @@ export class Colonies {
         current.position.x += Math.sin(current.angle) * current.slide * 5 * dt
         current.position.y += Math.cos(current.angle) * current.slide * 5 * dt
       } else if (i > 0 && current.status === 'follow' && !(squad.incident?.kind === 'dream' && i > source)) {
-        const gap = current.radius + previous.radius + .61
+        const gap = current.formationRadius + previous.formationRadius + .61
         const target = previous.breadcrumb(gap, desired)
         const pace = squad.incident?.kind === 'stray' && i > source ? strayPace : followPace
         if (current.position.distanceToSquared(target) > .025 ** 2 && (current.position.distanceToSquared(previous.position) > (gap * .74) ** 2 ||
@@ -378,7 +405,17 @@ export class Colonies {
       squad.roll = Math.max(0, squad.roll - dt)
       if (active || squad.roll > 0) continue
       squad.roll = 8 + Math.random() * 7
-      for (const actor of squad.members.slice(1)) {
+      const candidates = squad.members.slice(1)
+      if (squad === this.party && candidates.length > PLAYER_INCIDENT_SAMPLE) {
+        for (let i = 0; i < PLAYER_INCIDENT_SAMPLE; i++) {
+          const pick = i + Math.floor(Math.random() * (candidates.length - i))
+          const actor = candidates[pick]
+          candidates[pick] = candidates[i]
+          candidates[i] = actor
+        }
+        candidates.length = PLAYER_INCIDENT_SAMPLE
+      }
+      for (const actor of candidates) {
         if (actor.status === 'follow' && actor.speed > .25 && actor.protectedUntil <= time && Math.random() < INCIDENT_CHANCE) {
           successes.push({squad, actor})
         }
