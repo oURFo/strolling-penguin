@@ -11,12 +11,15 @@ const hint = get('message')
 const help = get<HTMLDialogElement>('instructions')
 const button = get<HTMLButtonElement>('honk')
 const sound = get<HTMLButtonElement>('sound')
+const cameraDistance = get<HTMLInputElement>('camera-distance')
+const cameraPercent = get<HTMLOutputElement>('camera-percent')
 const joystick = get('joystick')
 const marks = get('markers')
 const count = get('count')
 const bestNode = get('best')
 const saveKey = 'strolling-penguin-best'
 const strollKey = 'strolling-penguin-stroll'
+const cameraKey = 'strolling-penguin-camera-distance'
 type StrollSave = {
   version: 1
   time: number
@@ -131,6 +134,23 @@ function boot() {
   const controls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'Space', 'KeyE'])
   let pointer: number | undefined
   let nextHonk = 0
+  try {
+    const preference = localStorage.getItem(cameraKey)
+    if (preference !== null) cameraDistance.value = preference
+  } catch { /* Storage may be unavailable. */ }
+  let distanceScale = 1
+  function applyCameraDistance(persist = false) {
+    const percent = T.MathUtils.clamp(cameraDistance.valueAsNumber, 50, 100)
+    cameraPercent.value = percent + '%'
+    cameraDistance.setAttribute('aria-valuetext', percent + '%')
+    distanceScale = percent / 100
+    if (persist) {
+      try { localStorage.setItem(cameraKey, String(percent)) } catch { /* Continue without persistence. */ }
+    }
+  }
+  applyCameraDistance()
+  cameraDistance.addEventListener('input', () => applyCameraDistance())
+  cameraDistance.addEventListener('change', () => applyCameraDistance(true))
   let zoom = 1
   let initialized = false
   let previousCount = 0
@@ -168,7 +188,7 @@ function boot() {
     help.showModal()
   })
   window.addEventListener('keydown', e => {
-    if (!controls.has(e.code) || help.open || e.ctrlKey || e.altKey || e.metaKey) return
+    if (!controls.has(e.code) || help.open || e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()
     if (!e.repeat) activateAudio()
@@ -178,6 +198,12 @@ function boot() {
   window.addEventListener('keyup', e => keys.delete(e.code))
   window.addEventListener('blur', () => { keys.clear(); resetDrag() })
   const canvas = renderer.domElement
+  canvas.addEventListener('wheel', e => {
+    if (help.open || e.ctrlKey || e.metaKey || e.deltaY === 0) return
+    e.preventDefault()
+    cameraDistance.valueAsNumber = T.MathUtils.clamp(cameraDistance.valueAsNumber + Math.sign(e.deltaY) * 5, 50, 100)
+    applyCameraDistance(true)
+  }, {passive: false})
   canvas.addEventListener('pointerdown', e => {
     if (pointer !== undefined || e.button !== 0 || help.open) return
     if (e.pointerType === 'mouse') activateAudio()
@@ -226,7 +252,7 @@ function boot() {
     const t = initialized ? 1 - Math.exp(-dt * 5.8) : 1
     focus.lerp(view, t)
     const portrait = camera.aspect < .85
-    const desiredZoom = 1 + Math.min(.68, (colonies.party.members.length - 1) * .047)
+    const desiredZoom = distanceScale * (1 + Math.min(.68, (colonies.party.members.length - 1) * .047))
     zoom = T.MathUtils.lerp(zoom, desiredZoom, t)
     const distance = 2 * zoom * (portrait ? 1.15 : 1)
     camera.position.set(focus.x, focus.y + 9.15 * distance, focus.z + 12.8 * distance)
