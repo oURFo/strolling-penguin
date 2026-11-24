@@ -3,6 +3,7 @@ import { type Snowfield, type SnowParticles, type Footprints, random, softDot } 
 
 export type Status = 'solo' | 'leader' | 'follow' | 'trip' | 'dream' | 'stray'
 export type PenguinSave = {
+  species?: Penguin['species']
   seed: number
   position: [number, number]
   target: [number, number]
@@ -58,11 +59,11 @@ export class Penguin {
   root = new T.Group()
   body = new T.Group()
   head = new T.Group()
-  feet: T.Mesh[]
-  wings: T.Mesh[]
+  feet: T.Mesh[] = []
+  wings: T.Mesh[] = []
   eyes: T.Mesh[] = []
   pupils: T.Mesh[] = []
-  beak: T.Mesh
+  beak?: T.Mesh
   trumpet = new T.Group()
   position: T.Vector2
   route: T.Vector2[] = []
@@ -81,7 +82,7 @@ export class Penguin {
   protectedUntil = 0
   private distance = 0
   private side = 1
-  private shadow: T.Mesh
+  protected shadow: T.Mesh
   private tilt = 0
   private chick: boolean
   private gait = 0
@@ -91,9 +92,10 @@ export class Penguin {
   private idlePitch = 0
   private blinkIn = 1 + Math.random() * 4
 
-  constructor(scene: T.Scene, x: number, z: number, status: Status, player = false, private seed = Math.floor(Math.random() * 0x100000000)) {
+  constructor(scene: T.Scene, x: number, z: number, status: Status, player = false,
+    protected seed = Math.floor(Math.random() * 0x100000000), readonly species: 'penguin' | 'seal' = 'penguin') {
     const appearance = random(seed)
-    const chick = !player && appearance() < .43
+    const chick = !player && species === 'penguin' && appearance() < .43
     this.status = status
     this.position = new T.Vector2(x, z)
     this.target.copy(this.position)
@@ -102,6 +104,12 @@ export class Penguin {
     const sx = player ? 1.12 : (chick ? .95 : .85) + appearance() * .4
     const sz = player ? 1.30 : .9 + appearance() * .35
     this.radius = .3 * sx * this.height / 1.3
+    this.shadow = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), shadowMap)
+    this.shadow.scale.setScalar(this.height * .96)
+    this.shadow.renderOrder = 2
+    scene.add(this.root, this.shadow)
+    this.route.push(this.position.clone())
+    if (species === 'seal') return
     const palette = chick ? chicks : adults
     const coat = palette[Math.floor(appearance() * palette.length)]
     this.root.add(this.body)
@@ -132,16 +140,11 @@ export class Penguin {
       const tail = shape(this.body, scarf, -.205, .669, .245, .072, .18, .047)
       tail.rotation.z = -.32
     }
-    this.shadow = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), shadowMap)
-    this.shadow.scale.setScalar(this.height * .96)
-    this.shadow.renderOrder = 2
-    scene.add(this.root, this.shadow)
-    this.route.push(this.position.clone())
   }
 
   snapshot(): PenguinSave {
     return {
-      seed: this.seed, position: this.position.toArray(), target: this.target.toArray(),
+      species: this.species, seed: this.seed, position: this.position.toArray(), target: this.target.toArray(),
       route: this.route.map(point => point.toArray()), status: this.status, angle: this.angle, phase: this.phase,
       recruit: this.recruit, joy: this.joy, slide: this.slide, nextTurn: this.nextTurn,
       protectedUntil: this.protectedUntil, distance: this.distance, side: this.side,
@@ -220,6 +223,7 @@ export class Penguin {
       .multiply(heading.setFromAxisAngle(up, this.angle))
     this.shadow.position.set(x, ground + .02, z)
     this.shadow.quaternion.setFromUnitVectors(up, slope)
+    if (this.species === 'seal') this.shadow.quaternion.multiply(heading)
     const sway = Math.sin(this.phase) * this.gait
     this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
     const pitch = dream ? -.22 + Math.sin(time * 2) * .13 : this.honk > 0 ? -.24 : idle ? this.idlePitch : -.035
@@ -227,7 +231,7 @@ export class Penguin {
     this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0), blend)
     this.head.rotation.y = T.MathUtils.lerp(this.head.rotation.y, yaw, blend * .65)
     this.head.rotation.z = T.MathUtils.lerp(this.head.rotation.z, idle ? yaw * -.11 : -sway * .07, blend)
-    this.beak.visible = this.honk === 0
+    if (this.beak) this.beak.visible = this.honk === 0
     this.trumpet.visible = this.honk > 0
     this.trumpet.scale.z = 1 + Math.sin(this.honk / .6 * Math.PI) * .57
     this.eyes.forEach((eye, i) => {
@@ -251,7 +255,7 @@ export class Penguin {
     const lateral = this.radius * .6 * this.side
     const fx = x + Math.cos(this.angle) * lateral - Math.sin(this.angle) * .085
     const fz = z - Math.sin(this.angle) * lateral - Math.cos(this.angle) * .085
-    prints.add(fx, fz, this.angle + this.side * .15, this.height * .32, time)
+    if (this.species === 'penguin') prints.add(fx, fz, this.angle + this.side * .15, this.height * .32, time)
     particles.burst(fx, ground + .06, fz, this.chick ? 2 : 3, .64)
     return true
   }

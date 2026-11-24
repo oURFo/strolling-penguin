@@ -46,12 +46,11 @@ export type ColonySave = {
   solos: number[]
   squads: {members: number[], roll: number, incident?: SavedIncident, visit?: {target: number, until: number}}[]
   populated: string[]
-  seals: {key: string, position: [number, number], seed: number}[]
+  seals?: {position: [number, number], seed: number}[]
 }
 
 export class Colonies {
   penguins = new Set<Penguin>()
-  seals = new Map<string, Seal>()
   player: Penguin
   party: Squad
   squads: Squad[]
@@ -69,7 +68,7 @@ export class Colonies {
         if (entry.position.length !== 2 || !entry.position.every(Number.isFinite) || !entry.route.length) {
           throw new Error('Invalid saved penguin')
         }
-        const p = this.add(...entry.position, entry.status, id === playerId, entry.seed)
+        const p = this.add(...entry.position, entry.status, id === playerId, entry.seed, entry.species)
         p.restore(entry)
         return p
       })
@@ -91,7 +90,7 @@ export class Colonies {
       }))
       this.party = this.squads[0]
       this.populated = new Set(saved.populated)
-      for (const {key, position, seed} of saved.seals) this.seals.set(key, new Seal(scene, ...position, seed))
+      for (const {position, seed} of saved.seals ?? []) this.solo(...position, 0, 'seal', seed)
       return
     }
     this.player = this.add(0, 0, 'leader', true)
@@ -122,18 +121,17 @@ export class Colonies {
         visit: visit && ids.has(visit.target) ? {target: id(visit.target), until: visit.until} : undefined,
       })),
       populated: [...this.populated],
-      seals: [...this.seals].map(([key, seal]) => ({key, position: seal.position.toArray(), seed: seal.seed})),
     }
   }
 
-  private add(x: number, z: number, status: Penguin['status'], player = false, seed?: number) {
-    const penguin = new Penguin(this.scene, x, z, status, player, seed)
+  private add(x: number, z: number, status: Penguin['status'], player = false, seed?: number, species: Penguin['species'] = 'penguin') {
+    const penguin = species === 'seal' ? new Seal(this.scene, x, z, status, seed) : new Penguin(this.scene, x, z, status, player, seed)
     this.penguins.add(penguin)
     return penguin
   }
 
-  private solo(x: number, z: number, time = 0) {
-    const penguin = this.add(x, z, 'solo')
+  private solo(x: number, z: number, time = 0, species: Penguin['species'] = 'penguin', seed?: number) {
+    const penguin = this.add(x, z, 'solo', false, seed, species)
     penguin.nextTurn = time + 1.5 + Math.random() * 5
     this.solos.add(penguin)
   }
@@ -199,7 +197,7 @@ export class Colonies {
           solo.joy = .72
           solo.protectedUntil = time + 5
           this.party.members.push(solo)
-          this.notify('又一位夥伴加入了散步隊伍。', true)
+          this.notify(solo.species === 'seal' ? '海豹加入了散步隊伍。' : '又一位夥伴加入了散步隊伍。', true)
         }
       } else {
         solo.recruit = 0
@@ -224,7 +222,7 @@ export class Colonies {
         const px = x * 20 - this.snow.offset.x
         const pz = z * 20 - this.snow.offset.y
         if (Math.random() < SEAL_SPAWN) {
-          this.seals.set(key, new Seal(this.scene, px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6))
+          this.solo(px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6, time, 'seal')
         }
         if (x === 0 && z === 0) continue
         if (Math.random() < SOLO_SPAWN) this.solo(px + Math.random() * 8 - 4, pz + Math.random() * 8 - 4, time)
@@ -237,8 +235,6 @@ export class Colonies {
       const [x, z] = key.split(',').map(Number)
       if (Math.abs(x - cx) <= 3 && Math.abs(z - cz) <= 3) continue
       this.populated.delete(key)
-      this.seals.get(key)?.dispose(this.scene)
-      this.seals.delete(key)
     }
     for (const p of this.solos) {
       if (p.position.distanceToSquared(player) > 82 ** 2) {

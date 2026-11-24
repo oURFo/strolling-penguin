@@ -287,10 +287,6 @@ function boot() {
     prints.shift(x, z)
     particles.shift(x, z)
     for (const p of colonies.penguins) p.shift(x, z)
-    for (const seal of colonies.seals.values()) {
-      seal.position.x -= x
-      seal.position.y -= z
-    }
     for (const spot of [focus, wave.position, echo.position]) {
       spot.x -= x
       spot.z -= z
@@ -315,7 +311,6 @@ function boot() {
     const ground = snow.height(x, z)
     snow.update(x, z)
     updateCamera(dt)
-    for (const seal of colonies.seals.values()) seal.animate(time, snow)
     for (const p of colonies.penguins) {
       if (!p.animate(dt, time, snow, prints, particles)) continue
       if (p === player) {
@@ -341,7 +336,7 @@ function boot() {
     button.classList.toggle('ready', untilReady === 0 && colonies.ready())
     if (hintUntil <= time) {
       const status = colonies.party.incident
-      hint.textContent = status ? '沿著雪地腳印，回去找夥伴。' : '靠近落單的企鵝，邀牠一起散步。'
+      hint.textContent = status ? '沿著雪地腳印，回去找夥伴。' : '靠近落單的動物，邀牠一起散步。'
     }
     const total = colonies.party.members.length
     if (previousCount !== total) {
