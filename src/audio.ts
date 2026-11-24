@@ -41,20 +41,24 @@ function winterMusic(audio: AudioContext) {
 
 function snowSteps(audio: AudioContext) {
   return Array.from({length: 5}, (_, variant) => {
-    const length = .14 + variant * .009
+    const length = .15 + variant * .012
     const buffer = audio.createBuffer(1, Math.round(length * MUSIC_RATE), MUSIC_RATE)
     const samples = buffer.getChannelData(0)
-    let muffled = 0
-    let compression = 0
+    let fine = 0
+    let low = 0
+    let grain = 0
     for (let i = 0; i < samples.length; i++) {
       const t = i / MUSIC_RATE
       const noise = Math.random() * 2 - 1
-      muffled += (noise - muffled) * .24
-      compression += (noise - compression) * .052
-      const crunch = .28 + .72 * Math.abs(Math.sin(FULL_TURN * (29 + variant * 3) * t)) ** 3
-      const envelope = Math.min(1, t / .008) * (1 - t / length) ** 1.95
-      const weight = Math.sin(FULL_TURN * (97 * t - 126 * t * t)) * Math.exp(-t * 35)
-      samples[i] = (muffled * crunch * .83 + compression * .39 + weight * .21) * envelope
+      fine += (noise - fine) * .48
+      low += (noise - low) * .10
+      // Uneven little bursts suggest snow grains shifting as the foot presses down.
+      grain *= .976
+      if (Math.random() < .013) grain += .25 + Math.random() * .45
+      const press = Math.min(1, t / .023) * (1 - t / length) ** 1.65
+      const scuff = Math.exp(-((t - .068 - variant * .004) ** 2) / .00062)
+      samples[i] = ((fine - low) * (.62 + .28 * scuff + .22 * Math.min(1, grain))
+        + low * .18) * press
     }
     return buffer
   })
@@ -104,7 +108,7 @@ export class GameAudio {
     step.buffer = this.steps[Math.floor(Math.random() * this.steps.length)]
     step.playbackRate.value = .92 + Math.random() * .17
     const volume = audio.createGain()
-    volume.gain.value = .63 * level
+    volume.gain.value = .63 * .30 * level
     step.connect(volume).connect(this.output)
     step.start()
   }
