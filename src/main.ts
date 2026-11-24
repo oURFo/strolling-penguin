@@ -240,14 +240,14 @@ function boot() {
     const w = game.clientWidth
     const h = game.clientHeight
     for (const [p, item] of indicators) {
-      if (!colonies.penguins.has(p) || !(p.recruit || p.joy > .34 || colonies.needsHelp(p))) {
+      if (!colonies.penguins.has(p) || !(p.recruit || p.joy > .34 || colonies.showsIncidentMarker(p))) {
         item.remove()
         indicators.delete(p)
       }
     }
     for (const p of colonies.penguins) {
       const needsHelp = colonies.needsHelp(p) && colonies.party.members.includes(p)
-      if (!(p.recruit || p.joy > .34 || colonies.needsHelp(p))) continue
+      if (!(p.recruit || p.joy > .34 || colonies.showsIncidentMarker(p))) continue
       projected.copy(p.root.position)
       projected.y += (p.status === 'trip' ? p.height * .52 : p.height) + .44
       projected.project(camera)
@@ -341,7 +341,7 @@ function boot() {
     button.classList.toggle('ready', untilReady === 0 && colonies.ready())
     if (hintUntil <= time) {
       const status = colonies.party.incident
-      hint.textContent = status ? '順著警示或雪地腳印，回去找夥伴。' : '靠近落單的企鵝，邀牠一起散步。'
+      hint.textContent = status ? '沿著雪地腳印，回去找夥伴。' : '靠近落單的企鵝，邀牠一起散步。'
     }
     const total = colonies.party.members.length
     if (previousCount !== total) {

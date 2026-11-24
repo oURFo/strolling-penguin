@@ -15,6 +15,8 @@ const SOLO_SPAWN = 1 / 5
 const SEAL_SPAWN = 1 / 100
 const SQUAD_SPAWN = 1 / 8
 const INCIDENT_CHANCE = .84 / 10
+const INCIDENT_MARKER_DURATION = 2
+const RECOVERY_TIMEOUT = 10
 const VISIT_CHANCE = .12
 const VISIT_RADIUS = 18
 const VISIT_DURATION = 22
@@ -298,6 +300,7 @@ export class Colonies {
     const followPace = squad === this.party ? PLAYER_FOLLOW : NPC_FOLLOW
     if (event) {
       event.elapsed += dt
+      if (squad === this.party && this.splitAfterTimeout(event, time)) return
       if (event.kind === 'trip') {
         for (const fall of event.falls) {
           if (fall.delay <= event.elapsed && fall.member.status === 'follow') this.fall(fall.member)
@@ -336,6 +339,31 @@ export class Colonies {
     }
   }
 
+  private splitAfterTimeout(event: Incident, time: number) {
+    if (event.kind === 'stray') return false
+    const start = event.kind === 'trip' ? event.falls.find(fall => fall.member.status === 'trip')?.delay : 0
+    if (start === undefined || event.elapsed - start < RECOVERY_TIMEOUT) return false
+    const squad = this.party
+    const members = squad.members.slice(squad.members.indexOf(event.actor))
+      .filter(member => event.kind === 'dream' || member.status === 'trip')
+    squad.members = squad.members.filter(member => !members.includes(member))
+    const leader = members[0]
+    for (const member of members) {
+      const wasWaiting = member.status === 'trip' || member.status === 'dream'
+      member.status = member === leader ? 'leader' : 'follow'
+      member.slide = 0
+      member.joy = wasWaiting ? .34 : 0
+      member.protectedUntil = time + 5
+    }
+    leader.target.copy(leader.position)
+    leader.nextTurn = time + .7
+    this.squads.push({members, roll: 10})
+    squad.incident = undefined
+    squad.roll = 10
+    this.notify('等候的夥伴自己組成了新隊伍，繼續在雪地散步。')
+    return true
+  }
+
   private rollIncidents(dt: number, time: number) {
     const active = this.squads.some(squad => squad.incident)
     const successes: {squad: Squad, actor: Penguin}[] = []
@@ -367,8 +395,8 @@ export class Colonies {
       actor.status = kind
     }
     squad.incident = {actor, kind, target, falls, elapsed: 0}
-    if (squad === this.party) this.notify(kind === 'trip' ? '有夥伴跌倒了。回到牠身邊呼喚。'
-      : kind === 'dream' ? '有夥伴停下來發呆了。回去叫醒牠。' : '有夥伴拐往別處了，趕快追上牠！')
+    if (squad === this.party) this.notify(kind === 'trip' ? '有夥伴跌倒了，請在 10 秒內回去呼喚。'
+      : kind === 'dream' ? '有夥伴停下來發呆了，請在 10 秒內回去呼喚。' : '有夥伴拐往別處了，趕快追上牠！')
   }
 
   private strayTarget(squad: Squad, actor: Penguin) {
@@ -437,6 +465,15 @@ export class Colonies {
 
   needsHelp(p: Penguin) {
     return p.status === 'trip' || p.status === 'dream' || p.status === 'stray'
+  }
+
+  showsIncidentMarker(p: Penguin) {
+    if (p.status === 'stray') return true
+    if (p.status !== 'trip' && p.status !== 'dream') return false
+    const event = this.squads.find(squad => squad.incident)?.incident
+    if (!event || event.kind !== p.status) return false
+    const start = event.kind === 'trip' ? event.falls.find(fall => fall.member === p)?.delay : 0
+    return start !== undefined && event.elapsed - start < INCIDENT_MARKER_DURATION
   }
 
   rescue(time: number) {
