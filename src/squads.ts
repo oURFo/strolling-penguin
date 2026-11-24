@@ -1,5 +1,6 @@
 import * as T from 'three'
-import { Penguin } from './penguin'
+import { Penguin, type PenguinSave } from './penguin'
+import { Seal } from './seal'
 import { type Snowfield, type SnowParticles } from './snow'
 
 const RECRUIT = 2.15
@@ -11,6 +12,7 @@ const NPC_WALK = 1.65 * WALK_SCALE
 const PLAYER_FOLLOW = 4.65 * WALK_SCALE
 const NPC_FOLLOW = 2.75 * WALK_SCALE
 const SOLO_SPAWN = 1 / 5
+const SEAL_SPAWN = 1 / 100
 const SQUAD_SPAWN = 1 / 8
 const INCIDENT_CHANCE = .84 / 10
 const VISIT_CHANCE = .12
@@ -32,9 +34,22 @@ type Squad = {
   incident?: Incident
   visit?: {target: Penguin, until: number}
 }
+type SavedIncident = Omit<Incident, 'actor' | 'target' | 'falls'> & {
+  actor: number
+  target?: number
+  falls: {member: number, delay: number}[]
+}
+export type ColonySave = {
+  penguins: PenguinSave[]
+  solos: number[]
+  squads: {members: number[], roll: number, incident?: SavedIncident, visit?: {target: number, until: number}}[]
+  populated: string[]
+  seals: {key: string, position: [number, number], seed: number}[]
+}
 
 export class Colonies {
   penguins = new Set<Penguin>()
+  seals = new Map<string, Seal>()
   player: Penguin
   party: Squad
   squads: Squad[]
@@ -44,7 +59,39 @@ export class Colonies {
   private testPoint = new T.Vector3()
   private populated = new Set<string>()
 
-  constructor(private scene: T.Scene, private snow: Snowfield, private flakes: SnowParticles, private notify: (text: string, sound?: boolean) => void) {
+  constructor(private scene: T.Scene, private snow: Snowfield, private flakes: SnowParticles,
+    private notify: (text: string, sound?: boolean) => void, saved?: ColonySave) {
+    if (saved) {
+      const playerId = saved.squads[0]?.members[0]
+      const penguins = saved.penguins.map((entry, id) => {
+        if (entry.position.length !== 2 || !entry.position.every(Number.isFinite) || !entry.route.length) {
+          throw new Error('Invalid saved penguin')
+        }
+        const p = this.add(...entry.position, entry.status, id === playerId, entry.seed)
+        p.restore(entry)
+        return p
+      })
+      const bird = (id: number) => {
+        const p = penguins[id]
+        if (!p) throw new Error('Invalid saved squad member')
+        return p
+      }
+      this.player = bird(playerId)
+      this.solos = new Set(saved.solos.map(bird))
+      this.squads = saved.squads.map(({members, roll, incident, visit}) => ({
+        members: members.map(bird), roll,
+        incident: incident && {
+          ...incident, actor: bird(incident.actor),
+          target: incident.target === undefined ? undefined : penguins[incident.target],
+          falls: incident.falls.map(({member, delay}) => ({member: bird(member), delay})),
+        },
+        visit: visit && penguins[visit.target] ? {target: bird(visit.target), until: visit.until} : undefined,
+      }))
+      this.party = this.squads[0]
+      this.populated = new Set(saved.populated)
+      for (const {key, position, seed} of saved.seals) this.seals.set(key, new Seal(scene, ...position, seed))
+      return
+    }
     this.player = this.add(0, 0, 'leader', true)
     this.player.angle = .36
     this.party = {members: [this.player], roll: 8}
@@ -57,8 +104,28 @@ export class Colonies {
     }
   }
 
-  private add(x: number, z: number, status: Penguin['status'], player = false) {
-    const penguin = new Penguin(this.scene, x, z, status, player)
+  snapshot(): ColonySave {
+    const penguins = [...this.penguins]
+    const ids = new Map(penguins.map((penguin, i) => [penguin, i]))
+    const id = (p: Penguin) => ids.get(p)!
+    return {
+      penguins: penguins.map(p => p.snapshot()),
+      solos: [...this.solos].map(id),
+      squads: this.squads.map(({members, roll, incident, visit}) => ({
+        members: members.map(id), roll,
+        incident: incident && {
+          ...incident, actor: id(incident.actor), target: incident.target && ids.get(incident.target),
+          falls: incident.falls.map(({member, delay}) => ({member: id(member), delay})),
+        },
+        visit: visit && ids.has(visit.target) ? {target: id(visit.target), until: visit.until} : undefined,
+      })),
+      populated: [...this.populated],
+      seals: [...this.seals].map(([key, seal]) => ({key, position: seal.position.toArray(), seed: seal.seed})),
+    }
+  }
+
+  private add(x: number, z: number, status: Penguin['status'], player = false, seed?: number) {
+    const penguin = new Penguin(this.scene, x, z, status, player, seed)
     this.penguins.add(penguin)
     return penguin
   }
@@ -139,6 +206,7 @@ export class Colonies {
       solo.track()
     }
     for (const squad of [...this.squads]) this.updateSquad(squad, dt, time)
+    this.rollIncidents(dt, time)
   }
 
   private populate(time: number) {
@@ -149,10 +217,14 @@ export class Colonies {
     for (let z = cz - 2; z <= cz + 2; z++) {
       for (let x = cx - 2; x <= cx + 2; x++) {
         const key = x + ',' + z
-        if ((x === 0 && z === 0) || this.populated.has(key)) continue
+        if (this.populated.has(key)) continue
         this.populated.add(key)
         const px = x * 20 - this.snow.offset.x
         const pz = z * 20 - this.snow.offset.y
+        if (Math.random() < SEAL_SPAWN) {
+          this.seals.set(key, new Seal(this.scene, px + Math.random() * 12 - 6, pz + Math.random() * 12 - 6))
+        }
+        if (x === 0 && z === 0) continue
         if (Math.random() < SOLO_SPAWN) this.solo(px + Math.random() * 8 - 4, pz + Math.random() * 8 - 4, time)
         if ((x + 2 * z) % 4 === 0 && Math.random() < SQUAD_SPAWN) {
           this.squad(px - 5, pz + 4, 2 + Math.floor(Math.random() * 7))
@@ -161,7 +233,10 @@ export class Colonies {
     }
     for (const key of this.populated) {
       const [x, z] = key.split(',').map(Number)
-      if (Math.abs(x - cx) > 3 || Math.abs(z - cz) > 3) this.populated.delete(key)
+      if (Math.abs(x - cx) <= 3 && Math.abs(z - cz) <= 3) continue
+      this.populated.delete(key)
+      this.seals.get(key)?.dispose(this.scene)
+      this.seals.delete(key)
     }
     for (const p of this.solos) {
       if (p.position.distanceToSquared(player) > 82 ** 2) {
@@ -259,20 +334,31 @@ export class Colonies {
       if (event.actor.position.distanceToSquared(event.target.position) < 1.1 ** 2) this.merge(squad, event, time)
       else if (squad !== this.party && event.elapsed > 14) this.resolve(squad, time)
     }
-    if (squad.incident || members.length < 2) return
-    squad.roll -= dt
-    if (squad.roll > 0) return
-    squad.roll = 8 + Math.random() * 7
-    const candidates = members.slice(1).filter(p => p.status === 'follow' && p.speed > .25 && p.protectedUntil <= time)
-    if (!candidates.length || Math.random() >= INCIDENT_CHANCE) return
-    const actor = candidates[Math.floor(Math.random() * candidates.length)]
+  }
+
+  private rollIncidents(dt: number, time: number) {
+    const active = this.squads.some(squad => squad.incident)
+    const successes: {squad: Squad, actor: Penguin}[] = []
+    for (const squad of this.squads) {
+      if (squad.incident || squad.members.length < 2) continue
+      squad.roll = Math.max(0, squad.roll - dt)
+      if (active || squad.roll > 0) continue
+      squad.roll = 8 + Math.random() * 7
+      for (const actor of squad.members.slice(1)) {
+        if (actor.status === 'follow' && actor.speed > .25 && actor.protectedUntil <= time && Math.random() < INCIDENT_CHANCE) {
+          successes.push({squad, actor})
+        }
+      }
+    }
+    if (successes.length === 0) return
+    const {squad, actor} = successes[Math.floor(Math.random() * successes.length)]
     const roll = Math.random()
     const target = roll > .59 ? this.strayTarget(squad, actor) : undefined
     const kind = target ? 'stray' : roll < .34 ? 'trip' : 'dream'
     const falls: Incident['falls'] = []
     if (kind === 'trip') {
       let delay = 0
-      for (const member of members.slice(members.indexOf(actor))) {
+      for (const member of squad.members.slice(squad.members.indexOf(actor))) {
         falls.push({member, delay})
         delay += .2 + Math.random() * .8
       }

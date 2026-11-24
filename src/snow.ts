@@ -184,7 +184,7 @@ export function softDot() {
 
 const PRINTS = 2400
 const PRINT_LIFE = 92
-type Print = { x: number, z: number, heading: number, size: number, born: number }
+export type Print = { x: number, z: number, heading: number, size: number, born: number }
 
 export class Footprints {
   private cursor = 0
@@ -250,6 +250,21 @@ export class Footprints {
 
   update(time: number) {
     this.clock.value = time
+  }
+
+  snapshot(time: number, x: number, z: number) {
+    return this.marks.filter((mark): mark is Print => !!mark && time - mark.born < PRINT_LIFE &&
+      (mark.x - x) ** 2 + (mark.z - z) ** 2 < 90 ** 2).sort((a, b) => a.born - b.born)
+  }
+
+  restore(marks: Print[], time: number) {
+    for (const mark of marks.slice(-PRINTS)) {
+      const {x, z, heading, size, born} = mark ?? {}
+      if ([x, z, heading, size, born].every(Number.isFinite) && size > 0 && born <= time && time - born < PRINT_LIFE) {
+        this.add(x, z, heading, size, born)
+      }
+    }
+    this.update(time)
   }
 
   shift(dx: number, dz: number) {

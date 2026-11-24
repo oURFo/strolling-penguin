@@ -1,6 +1,6 @@
 import * as T from 'three'
-import { Footprints, random, Snowfield, SnowParticles, winterSprite } from './snow'
-import { Colonies, HONK } from './squads'
+import { Footprints, random, Snowfield, SnowParticles, winterSprite, type Print } from './snow'
+import { Colonies, HONK, type ColonySave } from './squads'
 import { GameAudio } from './audio'
 import type { Penguin } from './penguin'
 import './style.css'
@@ -16,8 +16,24 @@ const marks = get('markers')
 const count = get('count')
 const bestNode = get('best')
 const saveKey = 'strolling-penguin-best'
+const strollKey = 'strolling-penguin-stroll'
+type StrollSave = {
+  version: 1
+  time: number
+  offset: [number, number]
+  colonies: ColonySave
+  footprints: Print[]
+}
 let best = 1
 try { best = Math.max(1, Number(localStorage.getItem(saveKey)) || 1) } catch { /* Storage may be unavailable. */ }
+
+function readStroll(): StrollSave | undefined {
+  try {
+    const saved = JSON.parse(localStorage.getItem(strollKey) ?? 'null') as StrollSave | null
+    if (saved?.version === 1 && Number.isFinite(saved.time) && saved.time >= 0 &&
+      saved.offset?.length === 2 && saved.offset.every(Number.isFinite) && Array.isArray(saved.footprints)) return saved
+  } catch { /* A missing or invalid save starts a new stroll. */ }
+}
 
 const audio = new GameAudio()
 
@@ -73,8 +89,37 @@ function boot() {
     hintUntil = time + 5
     if (chime) audio.play('join')
   }
-  const colonies = new Colonies(scene, snow, particles, notify)
+  let saved = readStroll()
+  let colonies: Colonies
+  if (saved) {
+    const existing = new Set(scene.children)
+    try {
+      colonies = new Colonies(scene, snow, particles, notify, saved.colonies)
+      snow.offset.fromArray(saved.offset)
+      time = saved.time
+      prints.restore(saved.footprints, time)
+    } catch {
+      for (const object of [...scene.children]) if (!existing.has(object)) scene.remove(object)
+      saved = undefined
+      snow.offset.set(0, 0)
+      time = 0
+      colonies = new Colonies(scene, snow, particles, notify)
+    }
+  } else {
+    colonies = new Colonies(scene, snow, particles, notify)
+  }
   const player = colonies.player
+  let nextSave = time + 3
+  function saveStroll() {
+    const {x, y: z} = player.position
+    const state: StrollSave = {
+      version: 1, time, offset: snow.offset.toArray(), colonies: colonies.snapshot(),
+      footprints: prints.snapshot(time, x, z),
+    }
+    try { localStorage.setItem(strollKey, JSON.stringify(state)) } catch { /* Continue playing without storage. */ }
+  }
+  window.addEventListener('pagehide', saveStroll)
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveStroll() })
   const keys = new Set<string>()
   const movement = new T.Vector2()
   const drag = new T.Vector2()
@@ -242,6 +287,10 @@ function boot() {
     prints.shift(x, z)
     particles.shift(x, z)
     for (const p of colonies.penguins) p.shift(x, z)
+    for (const seal of colonies.seals.values()) {
+      seal.position.x -= x
+      seal.position.y -= z
+    }
     for (const spot of [focus, wave.position, echo.position]) {
       spot.x -= x
       spot.z -= z
@@ -249,7 +298,7 @@ function boot() {
   }
 
   let previous = performance.now()
-  snow.update(0, 0)
+  snow.update(player.position.x, player.position.y)
   updateCamera(0)
   renderer.setAnimationLoop(now => {
     const dt = Math.min(.045, Math.max(.001, (now - previous) / 1000))
@@ -266,6 +315,7 @@ function boot() {
     const ground = snow.height(x, z)
     snow.update(x, z)
     updateCamera(dt)
+    for (const seal of colonies.seals.values()) seal.animate(time, snow)
     for (const p of colonies.penguins) {
       if (!p.animate(dt, time, snow, prints, particles)) continue
       if (p === player) {
@@ -304,6 +354,10 @@ function boot() {
       bestNode.textContent = String(best)
     }
     updateMarkers()
+    if (time >= nextSave) {
+      nextSave = time + 3
+      saveStroll()
+    }
     renderer.render(scene, camera)
   })
 }

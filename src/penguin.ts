@@ -1,7 +1,23 @@
 import * as T from 'three'
-import { type Snowfield, type SnowParticles, type Footprints, softDot } from './snow'
+import { type Snowfield, type SnowParticles, type Footprints, random, softDot } from './snow'
 
 export type Status = 'solo' | 'leader' | 'follow' | 'trip' | 'dream' | 'stray'
+export type PenguinSave = {
+  seed: number
+  position: [number, number]
+  target: [number, number]
+  route: [number, number][]
+  status: Status
+  angle: number
+  phase: number
+  recruit: number
+  joy: number
+  slide: number
+  nextTurn: number
+  protectedUntil: number
+  distance: number
+  side: number
+}
 const sphere = new T.SphereGeometry(1, 20, 14)
 const cone = new T.ConeGeometry(1, 1, 18).rotateX(Math.PI / 2)
 const trumpetShape = new T.CylinderGeometry(1, .53, 1, 20, 1, true).rotateX(Math.PI / 2)
@@ -75,21 +91,23 @@ export class Penguin {
   private idlePitch = 0
   private blinkIn = 1 + Math.random() * 4
 
-  constructor(scene: T.Scene, x: number, z: number, status: Status, player = false, chick = !player && Math.random() < .43) {
+  constructor(scene: T.Scene, x: number, z: number, status: Status, player = false, private seed = Math.floor(Math.random() * 0x100000000)) {
+    const appearance = random(seed)
+    const chick = !player && appearance() < .43
     this.status = status
     this.position = new T.Vector2(x, z)
     this.target.copy(this.position)
     this.chick = chick
-    this.height = player ? 1.42 : chick ? .57 + Math.random() * .27 : 1.1 + Math.random() * .35
-    const sx = player ? 1.07 : (chick ? .95 : .85) + Math.random() * .4
-    const sz = .9 + Math.random() * .35
+    this.height = player ? 1.42 : chick ? .57 + appearance() * .27 : 1.1 + appearance() * .35
+    const sx = player ? 1.12 : (chick ? .95 : .85) + appearance() * .4
+    const sz = player ? 1.30 : .9 + appearance() * .35
     this.radius = .3 * sx * this.height / 1.3
     const palette = chick ? chicks : adults
-    const coat = palette[Math.floor(Math.random() * palette.length)]
+    const coat = palette[Math.floor(appearance() * palette.length)]
     this.root.add(this.body)
     this.body.scale.set(sx * this.height / 1.3, this.height / 1.3, sz * this.height / 1.3)
-    shape(this.body, coat, 0, .53, 0, chick ? .39 : .335, .48, .29)
-    shape(this.body, white, 0, .50, .197, chick ? .287 : .245, .365, .13)
+    shape(this.body, coat, 0, .53, 0, player ? .365 : chick ? .39 : .335, .48, player ? .325 : .29)
+    shape(this.body, white, 0, .50, player ? .227 : .197, player ? .272 : chick ? .287 : .245, .365, .13)
     this.wings = [-1, 1].map(sign => shape(this.body, coat, sign * .324, .58, -.008, .088, .265, .125))
     this.feet = [-1, 1].map(sign => shape(this.body, foot, sign * .145, .071, .094, .118, .067, .17))
     this.head.position.y = chick ? .95 : .995
@@ -110,8 +128,8 @@ export class Penguin {
     this.head.add(this.trumpet)
     this.trumpet.visible = false
     if (player) {
-      shape(this.body, scarf, 0, .795, .016, .298, .067, .268)
-      const tail = shape(this.body, scarf, -.205, .669, .201, .072, .18, .047)
+      shape(this.body, scarf, 0, .795, .016, .323, .067, .296)
+      const tail = shape(this.body, scarf, -.205, .669, .245, .072, .18, .047)
       tail.rotation.z = -.32
     }
     this.shadow = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), shadowMap)
@@ -119,6 +137,22 @@ export class Penguin {
     this.shadow.renderOrder = 2
     scene.add(this.root, this.shadow)
     this.route.push(this.position.clone())
+  }
+
+  snapshot(): PenguinSave {
+    return {
+      seed: this.seed, position: this.position.toArray(), target: this.target.toArray(),
+      route: this.route.map(point => point.toArray()), status: this.status, angle: this.angle, phase: this.phase,
+      recruit: this.recruit, joy: this.joy, slide: this.slide, nextTurn: this.nextTurn,
+      protectedUntil: this.protectedUntil, distance: this.distance, side: this.side,
+    }
+  }
+
+  restore({target, route, angle, phase, recruit, joy, slide, nextTurn, protectedUntil, distance, side}: PenguinSave) {
+    this.target.fromArray(target)
+    this.route = route.map(point => new T.Vector2().fromArray(point))
+    Object.assign(this, {angle, phase, recruit, joy, slide, nextTurn, protectedUntil, distance, side})
+    this.tilt = this.status === 'trip' ? 1.39 : 0
   }
 
   move(toward: T.Vector2, speed: number, dt: number) {
