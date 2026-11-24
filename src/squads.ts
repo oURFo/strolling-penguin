@@ -2,6 +2,7 @@ import * as T from 'three'
 import { Penguin, type PenguinSave } from './penguin'
 import { Seal } from './seal'
 import { Mammoth } from './mammoth'
+import { RestActivities } from './rest'
 import { type Snowfield, type SnowParticles } from './snow'
 
 const RECRUIT = 2.15
@@ -59,6 +60,7 @@ export class Colonies {
   player: Penguin
   party: Squad
   squads: Squad[]
+  readonly rest: RestActivities
   private solos = new Set<Penguin>()
   private frustum = new T.Frustum()
   private projection = new T.Matrix4()
@@ -67,6 +69,7 @@ export class Colonies {
 
   constructor(private scene: T.Scene, private snow: Snowfield, private flakes: SnowParticles,
     private notify: (text: string, sound?: boolean) => void, saved?: ColonySave) {
+    this.rest = new RestActivities(snow, flakes)
     if (saved) {
       const playerId = saved.squads[0]?.members[0]
       const penguins = saved.penguins.map((entry, id) => {
@@ -185,8 +188,12 @@ export class Colonies {
   update(dt: number, time: number, input: T.Vector2, camera: T.Camera) {
     const player = this.player
     for (const p of this.penguins) p.speed = 0
-    desired.copy(player.position).addScaledVector(input, WALK * dt)
-    player.move(desired, WALK * Math.min(1, input.length()), dt)
+    const inputStrength = input.length()
+    const moving = inputStrength > .025
+    if (moving) {
+      desired.copy(player.position).addScaledVector(input, WALK * dt)
+      player.move(desired, WALK * Math.min(1, inputStrength), dt)
+    }
     player.track()
     this.populate(time)
     this.projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
@@ -215,6 +222,7 @@ export class Colonies {
       }
       solo.track()
     }
+    this.rest.update(this.party.members, dt, time, moving, this.frustum)
     for (const squad of [...this.squads]) this.updateSquad(squad, dt, time)
     this.keepMammothsClear()
     this.rollIncidents(dt, time)
@@ -344,6 +352,10 @@ export class Colonies {
 
     for (let i = squad.recallable ? 0 : 1; i < members.length; i++) {
       const current = members[i]
+      if (squad === this.party && this.rest.includes(current)) {
+        current.track()
+        continue
+      }
       const previous = members[i - 1]
       if (current.status === 'stray' && event?.target) {
         current.move(event.target.position, strayPace, dt)
@@ -401,6 +413,7 @@ export class Colonies {
     const active = this.squads.some(squad => squad.incident)
     const successes: {squad: Squad, actor: Penguin}[] = []
     for (const squad of this.squads) {
+      if (squad === this.party && this.rest.active) continue
       if (squad.incident || squad.members.length < 2) continue
       squad.roll = Math.max(0, squad.roll - dt)
       if (active || squad.roll > 0) continue

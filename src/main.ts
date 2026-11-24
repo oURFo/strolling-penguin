@@ -266,15 +266,16 @@ function boot() {
     const w = game.clientWidth
     const h = game.clientHeight
     const waiting = colonies.waitingSquad
+    const showsMarker = (p: Penguin) => p.recruit || p.joy > .34 || p.restPose === 'chat' || colonies.showsIncidentMarker(p)
     for (const [p, item] of indicators) {
-      if (!colonies.penguins.has(p) || !(p.recruit || p.joy > .34 || colonies.showsIncidentMarker(p))) {
+      if (!colonies.penguins.has(p) || !showsMarker(p)) {
         item.remove()
         indicators.delete(p)
       }
     }
     for (const p of colonies.penguins) {
       const needsHelp = waiting?.members.includes(p)
-      if (!(p.recruit || p.joy > .34 || colonies.showsIncidentMarker(p))) continue
+      if (!showsMarker(p)) continue
       projected.copy(p.root.position)
       projected.y += (p.status === 'trip' ? p.height * .52 : p.height) + .44
       projected.project(camera)
@@ -290,8 +291,9 @@ function boot() {
       }
       marker.hidden = off && !needsHelp
       marker.style.display = marker.hidden ? 'none' : ''
-      marker.className = 'marker' + (p.recruit ? ' progress' : off ? ' edge' : '')
-      marker.textContent = p.recruit ? '' : p.status === 'trip' ? '✷' : p.status === 'dream' ? '?' : p.status === 'stray' ? '!' : '♥'
+      marker.className = 'marker' + (p.recruit ? ' progress' : off ? ' edge' : p.restPose === 'chat' ? ' social' : '')
+      marker.textContent = p.recruit ? '' : p.status === 'trip' ? '✷' : p.status === 'dream' ? '?'
+        : p.status === 'stray' ? '!' : p.restPose === 'chat' ? '…' : '♥'
       marker.style.setProperty('--progress', p.recruit * 100 + '%')
       if (off) {
         const dx = behind ? w / 2 - x : x - w / 2
@@ -363,7 +365,8 @@ function boot() {
     button.classList.toggle('ready', untilReady === 0 && colonies.ready())
     if (hintUntil <= time) {
       const status = colonies.waitingSquad
-      hint.textContent = status ? '沿著雪地腳印，回去找夥伴。' : '靠近落單的動物，邀牠一起散步。'
+      hint.textContent = status ? '沿著雪地腳印，回去找夥伴。'
+        : colonies.rest.active && colonies.party.members.length > 1 ? '夥伴們在休息。移動就會重新集合。' : '靠近落單的動物，邀牠一起散步。'
     }
     const total = colonies.party.members.length
     if (previousCount !== total) {

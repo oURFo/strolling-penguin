@@ -2,6 +2,7 @@ import * as T from 'three'
 import { type Snowfield, type SnowParticles, type Footprints, random, softDot } from './snow'
 
 export type Status = 'solo' | 'leader' | 'follow' | 'trip' | 'dream' | 'stray'
+export type RestPose = 'tumble' | 'dream' | 'hop' | 'chat'
 export type PenguinSave = {
   species?: Penguin['species']
   seed: number
@@ -75,6 +76,7 @@ export class Penguin {
   height: number
   phase = 0
   speed = 0
+  restPose?: RestPose
   recruit = 0
   joy = 0
   honk = 0
@@ -165,10 +167,18 @@ export class Penguin {
     if (distance < .0001 || speed <= 0) return
     const step = Math.min(distance, speed * dt)
     this.position.addScaledVector(look, step / distance)
-    const angle = Math.atan2(look.x, look.y)
+    this.turn(Math.atan2(look.x, look.y), dt)
+    this.speed = step / dt
+  }
+
+  faceToward(toward: T.Vector2, dt: number) {
+    look.subVectors(toward, this.position)
+    if (look.lengthSq() > .0001) this.turn(Math.atan2(look.x, look.y), dt)
+  }
+
+  private turn(angle: number, dt: number) {
     const difference = Math.atan2(Math.sin(angle - this.angle), Math.cos(angle - this.angle))
     this.angle += difference * Math.min(dt * 11, 1)
-    this.speed = step / dt
   }
 
   breadcrumb(gap: number, target: T.Vector2) {
@@ -192,8 +202,9 @@ export class Penguin {
   animate(dt: number, time: number, snow: Snowfield, prints: Footprints, particles: SnowParticles) {
     const {x, y: z} = this.position
     const ground = snow.height(x, z)
-    const stumble = this.status === 'trip'
-    const dream = this.status === 'dream'
+    const stumble = this.status === 'trip' || this.restPose === 'tumble'
+    const dream = this.status === 'dream' || this.restPose === 'dream'
+    const chatting = this.restPose === 'chat'
     this.joy = Math.max(0, this.joy - dt)
     this.honk = Math.max(0, this.honk - dt)
     this.tilt = T.MathUtils.lerp(this.tilt, stumble ? 1.39 : 0, Math.min(1, dt * 11))
@@ -219,6 +230,7 @@ export class Penguin {
     const blink = this.blinkIn < 0 ? Math.sin(-this.blinkIn / .15 * Math.PI) : 0
     const recoveryHop = this.joy > 0 ? Math.sin(this.joy / .72 * Math.PI) * .23 : 0
     const bounce = Math.abs(Math.sin(this.phase)) * this.gait * .06
+      + (this.restPose === 'hop' ? Math.abs(Math.sin(time * 8 + this.idleSeed)) ** 2 * .18 : 0)
     this.root.position.set(x, ground + recoveryHop + Math.sin(this.tilt) * .32 + bounce, z)
     this.root.quaternion.setFromUnitVectors(up, snow.slope(x, z, slope))
       .multiply(heading.setFromAxisAngle(up, this.angle))
@@ -227,8 +239,9 @@ export class Penguin {
     if (this.species !== 'penguin') this.shadow.quaternion.multiply(heading)
     const sway = Math.sin(this.phase) * this.gait
     this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
-    const pitch = dream ? -.22 + Math.sin(time * 2) * .13 : this.honk > 0 ? -.24 : idle ? this.idlePitch : -.035
-    const yaw = dream ? Math.sin(time * 2.1) * .45 : idle ? this.idleYaw : 0
+    const pitch = dream ? -.22 + Math.sin(time * 2) * .13 : this.honk > 0 ? -.24
+      : chatting ? Math.sin(time * 8 + this.idleSeed) * .13 : idle ? this.idlePitch : -.035
+    const yaw = dream ? Math.sin(time * 2.1) * .45 : idle && !chatting ? this.idleYaw : 0
     this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0), blend)
     this.head.rotation.y = T.MathUtils.lerp(this.head.rotation.y, yaw, blend * .65)
     this.head.rotation.z = T.MathUtils.lerp(this.head.rotation.z, idle ? yaw * -.11 : -sway * .07, blend)
@@ -246,7 +259,8 @@ export class Penguin {
       mesh.position.y = .071 + Math.max(0, step) * .17
       mesh.position.z = .094 + step * .13
       this.wings[i].rotation.x = -step * .34
-      this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : sway * .2 + (idle ? breath * .035 : 0)))
+      const playFlap = this.restPose === 'hop' ? .31 + Math.sin(time * 15) * .24 : 0
+      this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : sway * .2 + playFlap + (idle ? breath * .035 : 0)))
     })
     if (!moving) return
     this.distance += this.speed * dt

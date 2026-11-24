@@ -31,3 +31,13 @@
 @media (max-width: 600px) {
   .camera-controls { top: 62px; right: 14px; width: 113px; gap: 1px 4px; padding-inline: 7px; }
 }
+
+.marker.social {
+  width: 25px;
+  height: 20px;
+  border-radius: 9px 9px 9px 3px;
+  background: #f6fcff;
+  color: #497087;
+  font-size: 14px;
+  line-height: 1;
+}
