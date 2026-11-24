@@ -219,6 +219,7 @@ export class Penguin {
     const fz = z - Math.sin(this.angle) * lateral - Math.cos(this.angle) * .085
     prints.add(fx, fz, this.angle + this.side * .15, this.height * .32, time)
     particles.burst(fx, ground + .06, fz, this.chick ? 2 : 3, .64)
+    return true
   }
 
   shift(dx: number, dz: number) {

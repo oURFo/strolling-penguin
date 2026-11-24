@@ -1,6 +1,7 @@
 import * as T from 'three'
 import { Footprints, random, Snowfield, SnowParticles, winterSprite } from './snow'
-import { Colonies, HONK, WALK_SCALE } from './squads'
+import { Colonies, HONK } from './squads'
+import { GameAudio } from './audio'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -18,46 +19,16 @@ const saveKey = 'strolling-penguin-best'
 let best = 1
 try { best = Math.max(1, Number(localStorage.getItem(saveKey)) || 1) } catch { /* Storage may be unavailable. */ }
 
-let audio: AudioContext | undefined
-let audible = false
-function play(kind: 'honk' | 'join' | 'step') {
-  if (!audible) return
-  audio ??= new AudioContext()
-  void audio.resume().catch(() => {})
-  const at = audio.currentTime
-  if (kind === 'step') {
-    const buffer = audio.createBuffer(1, Math.floor(audio.sampleRate * .075), audio.sampleRate)
-    const data = buffer.getChannelData(0)
-    let grain = 0
-    for (let i = 0; i < data.length; i++) {
-      grain = grain * .61 + (Math.random() - .5) * .39
-      data[i] = grain * (1 - i / data.length) ** 2
-    }
-    const step = audio.createBufferSource()
-    step.buffer = buffer
-    const volume = audio.createGain()
-    volume.gain.value = .16
-    step.connect(volume).connect(audio.destination)
-    step.start()
-    return
-  }
-  const pairs = kind === 'honk' ? [[390, 235], [350, 210]] : [[540, 650], [720, 810]]
-  pairs.forEach(([start, end], i) => {
-    const t = at + i * .145
-    const voice = audio!.createOscillator()
-    const volume = audio!.createGain()
-    const filter = audio!.createBiquadFilter()
-    voice.type = kind === 'honk' ? 'triangle' : 'sine'
-    filter.frequency.value = 1100
-    voice.frequency.setValueAtTime(start, t)
-    voice.frequency.exponentialRampToValueAtTime(end, t + .14)
-    volume.gain.setValueAtTime(.001, t)
-    volume.gain.exponentialRampToValueAtTime(kind === 'honk' ? .18 : .09, t + .025)
-    volume.gain.exponentialRampToValueAtTime(.001, t + .19)
-    voice.connect(filter).connect(volume).connect(audio!.destination)
-    voice.start(t)
-    voice.stop(t + .20)
-  })
+const audio = new GameAudio()
+
+function syncAudioButton() {
+  sound.setAttribute('aria-pressed', String(audio.active))
+  sound.setAttribute('aria-label', audio.active ? '關閉音樂與音效' : '開啟音樂與音效')
+}
+
+function activateAudio() {
+  audio.activate()
+  syncAudioButton()
 }
 
 function boot() {
@@ -100,7 +71,7 @@ function boot() {
   const notify = (value: string, chime = false) => {
     hint.textContent = value
     hintUntil = time + 5
-    if (chime) play('join')
+    if (chime) audio.play('join')
   }
   const colonies = new Colonies(scene, snow, particles, notify)
   const player = colonies.player
@@ -115,7 +86,6 @@ function boot() {
   const controls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'Space', 'KeyE'])
   let pointer: number | undefined
   let nextHonk = 0
-  let nextStep = 0
   let zoom = 1
   let initialized = false
   let previousCount = 0
@@ -136,15 +106,16 @@ function boot() {
     wave.position.set(originX, snow.height(x, z) + .68, originZ)
     echo.position.copy(wave.position)
     if (colonies.rescue(time)) notify('叫回夥伴了，一起繼續散步。')
-    play('honk')
+    audio.play('honk')
   }
 
-  button.addEventListener('click', honk)
+  button.addEventListener('click', () => {
+    activateAudio()
+    honk()
+  })
   sound.addEventListener('click', () => {
-    audible = !audible
-    sound.setAttribute('aria-pressed', String(audible))
-    sound.setAttribute('aria-label', audible ? '關閉音效' : '開啟音效')
-    if (audible) play('join')
+    audio.toggle()
+    syncAudioButton()
   })
   get('help').addEventListener('click', () => {
     keys.clear()
@@ -155,6 +126,7 @@ function boot() {
     if (!controls.has(e.code) || help.open || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()
+    if (!e.repeat) activateAudio()
     keys.add(e.code)
     if (!e.repeat && (e.code === 'Space' || e.code === 'KeyE')) honk()
   })
@@ -163,6 +135,7 @@ function boot() {
   const canvas = renderer.domElement
   canvas.addEventListener('pointerdown', e => {
     if (pointer !== undefined || e.button !== 0 || help.open) return
+    if (e.pointerType === 'mouse') activateAudio()
     pointer = e.pointerId
     start.set(e.clientX, e.clientY)
     canvas.setPointerCapture(pointer)
@@ -183,6 +156,9 @@ function boot() {
     joystick.firstElementChild!.removeAttribute('style')
     joystick.classList.remove('active')
   }
+  canvas.addEventListener('pointerup', e => {
+    if (e.pointerId === pointer) activateAudio()
+  })
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) {
     canvas.addEventListener(type, e => { if (e.pointerId === pointer) resetDrag() })
   }
@@ -290,10 +266,14 @@ function boot() {
     const ground = snow.height(x, z)
     snow.update(x, z)
     updateCamera(dt)
-    for (const p of colonies.penguins) p.animate(dt, time, snow, prints, particles)
-    if (player.speed > .5 && time >= nextStep) {
-      nextStep = time + .18 / WALK_SCALE
-      play('step')
+    for (const p of colonies.penguins) {
+      if (!p.animate(dt, time, snow, prints, particles)) continue
+      if (p === player) {
+        audio.step()
+      } else {
+        const distance = p.position.distanceTo(player.position)
+        if (distance < 5) audio.step(.26 * (1 - distance / 5))
+      }
     }
     prints.update(time)
     particles.update(dt, x, z, ground)
@@ -335,5 +315,3 @@ try {
   hint.textContent = '無法啟動 3D 雪原。請確認瀏覽器已啟用 WebGL 2。'
   button.disabled = true
 }
-
-

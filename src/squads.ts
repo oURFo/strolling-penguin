@@ -4,13 +4,13 @@ import { type Snowfield, type SnowParticles } from './snow'
 
 const RECRUIT = 2.15
 export const HONK = 7.5
-export const WALK_SCALE = .75
+const WALK_SCALE = .75
 const WALK = 3.45 * WALK_SCALE
 const SOLO_WALK = .66 * WALK_SCALE
 const NPC_WALK = 1.65 * WALK_SCALE
 const PLAYER_FOLLOW = 4.65 * WALK_SCALE
 const NPC_FOLLOW = 2.75 * WALK_SCALE
-const SOLO_SPAWN = 1 / 10
+const SOLO_SPAWN = 1 / 5
 const SQUAD_SPAWN = 1 / 8
 const INCIDENT_CHANCE = .84 / 10
 const VISIT_CHANCE = .12
