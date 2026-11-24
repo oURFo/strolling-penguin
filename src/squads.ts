@@ -33,6 +33,7 @@ type Incident = {
 type Squad = {
   members: Penguin[]
   roll: number
+  recallable?: boolean
   incident?: Incident
   visit?: {target: Penguin, until: number}
 }
@@ -44,7 +45,7 @@ type SavedIncident = Omit<Incident, 'actor' | 'target' | 'falls'> & {
 export type ColonySave = {
   penguins: PenguinSave[]
   solos: number[]
-  squads: {members: number[], roll: number, incident?: SavedIncident, visit?: {target: number, until: number}}[]
+  squads: {members: number[], roll: number, recallable?: boolean, incident?: SavedIncident, visit?: {target: number, until: number}}[]
   populated: string[]
   seals?: {position: [number, number], seed: number}[]
 }
@@ -79,8 +80,8 @@ export class Colonies {
       }
       this.player = bird(playerId)
       this.solos = new Set(saved.solos.map(bird))
-      this.squads = saved.squads.map(({members, roll, incident, visit}) => ({
-        members: members.map(bird), roll,
+      this.squads = saved.squads.map(({members, roll, recallable, incident, visit}) => ({
+        members: members.map(bird), roll, recallable,
         incident: incident && {
           ...incident, actor: bird(incident.actor),
           target: incident.target === undefined ? undefined : penguins[incident.target],
@@ -89,6 +90,7 @@ export class Colonies {
         visit: visit && penguins[visit.target] ? {target: bird(visit.target), until: visit.until} : undefined,
       }))
       this.party = this.squads[0]
+      if (this.party.incident) this.detach(this.party.incident)
       this.populated = new Set(saved.populated)
       for (const {position, seed} of saved.seals ?? []) this.solo(...position, 0, 'seal', seed)
       return
@@ -112,8 +114,8 @@ export class Colonies {
     return {
       penguins: penguins.map(p => p.snapshot()),
       solos: [...this.solos].map(id),
-      squads: this.squads.map(({members, roll, incident, visit}) => ({
-        members: members.map(id), roll,
+      squads: this.squads.map(({members, roll, recallable, incident, visit}) => ({
+        members: members.map(id), roll, recallable,
         incident: incident && {
           ...incident, actor: id(incident.actor), target: incident.target && ids.get(incident.target),
           falls: incident.falls.map(({member, delay}) => ({member: id(member), delay})),
@@ -243,6 +245,7 @@ export class Colonies {
       }
     }
     for (const squad of this.squads.slice(1)) {
+      if (squad.recallable) continue
       if (squad.members.some(p => p.position.distanceToSquared(player) < 82 ** 2)) continue
       this.squads.splice(this.squads.indexOf(squad), 1)
       for (const p of squad.members) this.remove(p)
@@ -286,31 +289,33 @@ export class Colonies {
   private updateSquad(squad: Squad, dt: number, time: number) {
     const members = squad.members
     const leader = members[0]
-    if (squad !== this.party) {
+    if (squad !== this.party && !squad.recallable) {
       this.leadNpcSquad(squad, dt, time)
       leader.track()
     }
     const event = squad.incident
     const source = event ? members.indexOf(event.actor) : -1
-    const strayPace = (squad === this.party ? WALK : NPC_WALK) * .5
-    const followPace = squad === this.party ? PLAYER_FOLLOW : NPC_FOLLOW
+    const strayPace = (squad.recallable ? WALK : NPC_WALK) * .5
+    const followPace = squad === this.party || squad.recallable ? PLAYER_FOLLOW : NPC_FOLLOW
     if (event) {
       event.elapsed += dt
-      if (squad === this.party && this.splitAfterTimeout(event, time)) return
+      if (squad.recallable && this.splitAfterTimeout(squad, event, time)) return
       if (event.kind === 'trip') {
         for (const fall of event.falls) {
           if (fall.delay <= event.elapsed && fall.member.status === 'follow') this.fall(fall.member)
         }
       } else if (event.kind === 'stray' && (!event.target || !this.penguins.has(event.target) || members.includes(event.target))) {
-        this.resolve(squad, time)
+        if (squad.recallable) this.rejoin(squad, time)
+        else this.resolve(squad, time)
+        return
       }
-      if (squad !== this.party && squad.incident && event.elapsed >= 3.4 && event.kind !== 'stray') {
+      if (!squad.recallable && squad.incident && event.elapsed >= 3.4 && event.kind !== 'stray') {
         leader.honk = .6
         this.resolve(squad, time)
       }
     }
 
-    for (let i = 1; i < members.length; i++) {
+    for (let i = squad.recallable ? 0 : 1; i < members.length; i++) {
       const current = members[i]
       const previous = members[i - 1]
       if (current.status === 'stray' && event?.target) {
@@ -319,7 +324,7 @@ export class Colonies {
         current.slide = Math.max(0, current.slide - dt)
         current.position.x += Math.sin(current.angle) * current.slide * 5 * dt
         current.position.y += Math.cos(current.angle) * current.slide * 5 * dt
-      } else if (current.status === 'follow' && !(squad.incident?.kind === 'dream' && i > source)) {
+      } else if (i > 0 && current.status === 'follow' && !(squad.incident?.kind === 'dream' && i > source)) {
         const gap = current.radius + previous.radius + .61
         const target = previous.breadcrumb(gap, desired)
         const pace = squad.incident?.kind === 'stray' && i > source ? strayPace : followPace
@@ -331,18 +336,22 @@ export class Colonies {
 
     if (squad.incident?.kind === 'stray' && event?.target) {
       if (event.actor.position.distanceToSquared(event.target.position) < 1.1 ** 2) this.merge(squad, event, time)
-      else if (squad !== this.party && event.elapsed > 14) this.resolve(squad, time)
+      else if (!squad.recallable && event.elapsed > 14) this.resolve(squad, time)
     }
   }
 
-  private splitAfterTimeout(event: Incident, time: number) {
+  private detach(event: Incident) {
+    const members = this.party.members.splice(this.party.members.indexOf(event.actor))
+    event.falls = event.falls.filter(fall => members.includes(fall.member))
+    this.party.incident = undefined
+    this.squads.push({members, roll: 10, recallable: true, incident: event})
+  }
+
+  private splitAfterTimeout(squad: Squad, event: Incident, time: number) {
     if (event.kind === 'stray') return false
     const start = event.kind === 'trip' ? event.falls.find(fall => fall.member.status === 'trip')?.delay : 0
     if (start === undefined || event.elapsed - start < RECOVERY_TIMEOUT) return false
-    const squad = this.party
-    const members = squad.members.slice(squad.members.indexOf(event.actor))
-      .filter(member => event.kind === 'dream' || member.status === 'trip')
-    squad.members = squad.members.filter(member => !members.includes(member))
+    const {members} = squad
     const leader = members[0]
     for (const member of members) {
       const wasWaiting = member.status === 'trip' || member.status === 'dream'
@@ -353,9 +362,10 @@ export class Colonies {
     }
     leader.target.copy(leader.position)
     leader.nextTurn = time + .7
-    this.squads.push({members, roll: 10})
+    squad.recallable = undefined
     squad.incident = undefined
     squad.roll = 10
+    this.party.roll = 10
     this.notify('等候的夥伴自己組成了新隊伍，繼續在雪地散步。')
     return true
   }
@@ -390,9 +400,14 @@ export class Colonies {
     } else {
       actor.status = kind
     }
-    squad.incident = {actor, kind, target, falls, elapsed: 0}
-    if (squad === this.party) this.notify(kind === 'trip' ? '有夥伴跌倒了，請在 10 秒內回去呼喚。'
-      : kind === 'dream' ? '有夥伴停下來發呆了，請在 10 秒內回去呼喚。' : '有夥伴拐往別處了，趕快追上牠！')
+    const incident = {actor, kind, target, falls, elapsed: 0} satisfies Incident
+    if (squad === this.party) {
+      this.detach(incident)
+      this.notify(kind === 'trip' ? '有夥伴跌倒了，請在 10 秒內回去呼喚。'
+        : kind === 'dream' ? '有夥伴停下來發呆了，請在 10 秒內回去呼喚。' : '有夥伴拐往別處了，趕快追上牠！')
+    } else {
+      squad.incident = incident
+    }
   }
 
   private strayTarget(squad: Squad, actor: Penguin) {
@@ -438,7 +453,10 @@ export class Colonies {
     to.members.push(...moved)
     from.incident = undefined
     from.roll = 10
-    if (from === this.party) this.notify('有夥伴加入了別隊，牠們會留在那裡。')
+    if (from.recallable) {
+      this.squads.splice(this.squads.indexOf(from), 1)
+      this.notify('有夥伴加入了別隊，牠們會留在那裡。')
+    }
   }
 
   private resolve(squad: Squad, time: number) {
@@ -455,12 +473,13 @@ export class Colonies {
     squad.roll = 8 + Math.random() * 7
   }
 
-  ready() {
-    return this.party.members.some(p => this.needsHelp(p) && p.position.distanceToSquared(this.player.position) <= HONK ** 2)
+  get waitingSquad() {
+    return this.squads.find(squad => squad.recallable)
   }
 
-  needsHelp(p: Penguin) {
-    return p.status === 'trip' || p.status === 'dream' || p.status === 'stray'
+  ready() {
+    return this.waitingSquad?.members.some(p =>
+      p.position.distanceToSquared(this.player.position) <= HONK ** 2) ?? false
   }
 
   showsIncidentMarker(p: Penguin) {
@@ -472,31 +491,22 @@ export class Colonies {
     return start !== undefined && event.elapsed - start < INCIDENT_MARKER_DURATION
   }
 
-  rescue(time: number) {
-    const incident = this.party.incident
-    if (!incident || !this.ready()) return false
-    if (incident.kind === 'trip') {
-      for (const fall of incident.falls) {
-        const p = fall.member
-        if (p.status !== 'trip' || p.position.distanceToSquared(this.player.position) > HONK ** 2) continue
-        p.status = 'follow'
-        p.slide = 0
-        p.joy = .72
-        p.protectedUntil = time + 4
-      }
-      const scheduled = incident.falls.filter(fall => fall.delay > incident.elapsed || fall.member.status === 'trip')
-      if (!scheduled.length) this.resolve(this.party, time)
-      else {
-        // A recovered link stops the domino effect from reaching unfallen birds behind it.
-        const firstRecovered = incident.falls.findIndex(fall => fall.member.protectedUntil > time && fall.delay <= incident.elapsed)
-        if (firstRecovered >= 0) incident.falls = incident.falls.filter((fall, i) =>
-          fall.member.status === 'trip' || (i < firstRecovered && fall.delay > incident.elapsed))
-        if (!incident.falls.length) this.resolve(this.party, time)
-        else incident.actor = incident.falls[0].member
-      }
-    } else {
-      this.resolve(this.party, time)
+  private rejoin(squad: Squad, time: number) {
+    for (const p of squad.members) {
+      p.status = 'follow'
+      p.slide = 0
+      p.joy = .72
+      p.protectedUntil = time + 4
     }
+    this.party.members.push(...squad.members)
+    this.party.roll = 8 + Math.random() * 7
+    this.squads.splice(this.squads.indexOf(squad), 1)
+  }
+
+  rescue(time: number) {
+    const squad = this.waitingSquad
+    if (!squad || !this.ready()) return false
+    this.rejoin(squad, time)
     return true
   }
 }
