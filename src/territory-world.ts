@@ -251,7 +251,7 @@ export class TerritoryWorld {
     return model
   }
 
-  render(view: HTMLElement, position: PlotCell, dx: number, dy: number, dt: number, zoom: number) {
+  render(view: HTMLElement, position: PlotCell, dx: number, dy: number, dt: number, zoom: number, angle: number) {
     const w = view.clientWidth, h = view.clientHeight
     if (w < 1 || h < 1) return false
     if (w !== this.w || h !== this.h) {
@@ -276,7 +276,8 @@ export class TerritoryWorld {
     this.snow.update(x, z)
     this.focus.set(x, ground + .26, z - 2.4)
     const distance = 2 * zoom * (this.camera.aspect < .85 ? 1.15 : 1)
-    this.camera.position.set(x, this.focus.y + 9.15 * distance, this.focus.z + 12.8 * distance)
+    this.camera.position.set(this.focus.x + Math.sin(angle) * 12.8 * distance,
+      this.focus.y + 9.15 * distance, this.focus.z + Math.cos(angle) * 12.8 * distance)
     this.camera.lookAt(this.focus)
     this.camera.updateMatrixWorld()
     const stepped = this.avatar.animate(dt, this.time, this.snow, this.prints, this.flakes)

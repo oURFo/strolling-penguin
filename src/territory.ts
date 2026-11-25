@@ -181,6 +181,7 @@ export class Territory {
   private page = element('territory')
   private view = element('territory-view')
   private cameraDistance = element<HTMLInputElement>('territory-camera-distance')
+  private cameraAngle = element<HTMLInputElement>('territory-camera-angle')
   private zoom = bindCameraZoom(this.cameraDistance, element<HTMLOutputElement>('territory-camera-percent'),
     'strolling-penguin-territory-camera')
   private world?: TerritoryWorld
@@ -216,6 +217,21 @@ export class Territory {
     private renderer: WebGLRenderer, private player: Penguin,
     private activateAudio: () => void, private stepAudio: () => void) {
     this.enableMovement()
+    const angleKey = 'strolling-penguin-territory-camera-angle'
+    try {
+      const value = localStorage.getItem(angleKey)
+      if (value !== null) this.cameraAngle.value = value
+    } catch { /* Continue without storage. */ }
+    const updateAngle = () => {
+      const degrees = this.cameraAngle.value + '°'
+      element<HTMLOutputElement>('territory-angle-value').value = degrees
+      this.cameraAngle.setAttribute('aria-valuetext', degrees)
+    }
+    updateAngle()
+    this.cameraAngle.addEventListener('input', updateAngle)
+    this.cameraAngle.addEventListener('change', () => {
+      try { localStorage.setItem(angleKey, this.cameraAngle.value) } catch { /* Continue without storage. */ }
+    })
     this.roster.addEventListener('close', () => this.portraitObserver.disconnect())
     element('build-territory').onclick = () => {
       this.showCatalog()
@@ -286,7 +302,8 @@ export class Territory {
   private enableMovement() {
     const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
     window.addEventListener('keydown', event => {
-      if (this.page.hidden || this.menuOpen() || event.target === this.cameraDistance || !movement.has(event.code) ||
+      if (this.page.hidden || this.menuOpen() || event.target === this.cameraDistance ||
+          event.target === this.cameraAngle || !movement.has(event.code) ||
         event.altKey || event.ctrlKey || event.metaKey) return
       event.preventDefault()
       if (!event.repeat) this.activateAudio()
@@ -362,12 +379,14 @@ export class Territory {
     }
     const x = position.x
     const y = position.y
+    const angle = this.cameraAngle.valueAsNumber * Math.PI / 180
     if (Math.hypot(dx, dy) > .065) {
       const pace = 3.45 * .75 / TERRITORY_TILE
-      this.state.walk(dx * dt * pace, dy * dt * pace)
+      this.state.walk((dx * Math.cos(angle) + dy * Math.sin(angle)) * dt * pace,
+        (dy * Math.cos(angle) - dx * Math.sin(angle)) * dt * pace)
     }
     if (!this.world) return
-    if (this.world.render(this.view, position, position.x - x, position.y - y, dt, this.zoom.scale)) this.stepAudio()
+    if (this.world.render(this.view, position, position.x - x, position.y - y, dt, this.zoom.scale, angle)) this.stepAudio()
     for (const [house, spot] of this.spots) {
       const point = this.world.project(house)
       spot.hidden = !point.visible
