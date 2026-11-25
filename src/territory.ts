@@ -445,9 +445,10 @@ export class Territory {
       const {width, depth} = buildingFootprint(kind)
       const footprint = `${width} × ${depth} 格`
       detail.textContent = info.capacity ? `${footprint} · 可住 ${info.capacity} 位`
-        : info.size ? `${footprint} · ${kind === 'fishing' ? '可釣魚' : kind === 'filter' ? '可接水喝' : '每小時 +1 金幣'}`
+        : info.size ? `${footprint} · ${kind === 'school' ? '自動呼喚掉隊夥伴' : kind === 'fishing' ? '可釣魚' : kind === 'filter' ? '可接水喝' : '每小時 +1 金幣'}`
         : kind === 'christmas-tree' ? '可休息、看燈 · 自由放置'
-        : kind === 'snow-machine' ? '小企鵝可玩雪 · 自由放置' : '可觀看 · 自由放置'
+        : kind === 'snow-machine' ? '小企鵝可玩雪 · 自由放置'
+        : kind === 'snow-lamp' || kind === 'tall-lamp' ? '夜間照明 · 自由放置' : '可觀看 · 自由放置'
       label.append(detail)
       const price = document.createElement('strong')
       const coin = document.createElement('span')

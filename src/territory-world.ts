@@ -5,7 +5,7 @@ import { createAnimal } from './animals'
 import { Footprints, Snowfield, SnowParticles } from './snow'
 import { Residents } from './residents'
 import { BUILDINGS, buildingCenter, buildingFootprint, buildingInfo, buildingKind, type BuildKind, type Building } from './buildings'
-import { animateDecoration, decorationModel } from './decorations'
+import { animateDecoration, decorationModel, lightPathLamp } from './decorations'
 
 export const TERRITORY_TILE = 3.1
 const WALK = 3.45 * .75
@@ -21,6 +21,25 @@ const entrance = new T.SphereGeometry(1, 20, 12)
 const snowCap = new T.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, .51)
 const shard = new T.CylinderGeometry(.08, .25, 1, 5, 1).translate(0, .5, 0)
 const archBlock = new T.BoxGeometry(.29, .32, .35)
+const territoryClock = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Taipei', hour: '2-digit', hourCycle: 'h23',
+})
+const daylight = {
+  sky: new T.Color(0xd9e8f6), ambient: new T.Color(0xf6f7ff), ground: new T.Color(0xa2bbce),
+  sun: new T.Color(0xffe4ce), grid: new T.Color(0x5988a6),
+}
+const moonlight = {
+  sky: new T.Color(0x172943), ambient: new T.Color(0x9ebfff), ground: new T.Color(0x4b6898),
+  sun: new T.Color(0xb7d9ff), grid: new T.Color(0xc0e3ff),
+}
+
+function isTerritoryNight(now: number) {
+  const hour = Number(territoryClock.format(now))
+  return hour >= 18 || hour < 6
+}
+
+const previewNight = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) &&
+  new URLSearchParams(location.search).get('lighting') === 'night'
 
 function iceCourses() {
   const parts: T.BufferGeometry[] = []
@@ -57,6 +76,14 @@ type PlotCell = {x: number, y: number}
 
 export class TerritoryWorld {
   private scene = new T.Scene()
+  private sky = new T.Color()
+  private fog = new T.FogExp2(0xd9e8f6, .020)
+  private ambient = new T.HemisphereLight()
+  private sun = new T.DirectionalLight()
+  private lampLights = Array.from({length: 6}, () => new T.PointLight(0xffca83, 0, 8))
+  private night = 0
+  private nightTarget = 0
+  private clockSecond = -1
   private snow = new Snowfield(this.scene, true)
   private prints = new Footprints(this.scene, this.snow)
   private flakes = new SnowParticles(this.scene)
@@ -84,12 +111,14 @@ export class TerritoryWorld {
   private portraitTarget?: T.WebGLRenderTarget
 
   constructor(private renderer: T.WebGLRenderer, player: Penguin, private width: number, private height: number) {
-    this.scene.background = new T.Color(0xd9e8f6)
-    this.scene.fog = new T.FogExp2(0xd9e8f6, .020)
-    this.scene.add(new T.HemisphereLight(0xf6f7ff, 0xa2bbce, 2.12))
-    const sun = new T.DirectionalLight(0xffe4ce, 1.42)
-    sun.position.set(-7, 9, 4)
-    this.scene.add(sun)
+    this.scene.background = this.sky
+    this.scene.fog = this.fog
+    this.sun.position.set(-7, 9, 4)
+    this.scene.add(this.ambient, this.sun)
+    for (const light of this.lampLights) {
+      light.visible = false
+      this.scene.add(light)
+    }
     this.avatar = new Penguin(this.scene, 0, 0, 'leader', true, player.snapshot().seed)
     this.residents = new Residents(this.scene, TERRITORY_TILE, width, height)
     this.avatar.angle = player.angle
@@ -103,6 +132,28 @@ export class TerritoryWorld {
     this.scene.add(this.grid, this.bounds, this.preview)
     this.grid.visible = this.preview.visible = false
     this.makeGrid()
+    this.updateLighting(0, true)
+  }
+
+  private updateLighting(dt: number, immediate = false) {
+    const now = Date.now()
+    const second = Math.floor(now / 1000)
+    if (second !== this.clockSecond || immediate) {
+      this.clockSecond = second
+      this.nightTarget = Number(previewNight || isTerritoryNight(now))
+    }
+    const blend = immediate ? this.nightTarget : this.night + T.MathUtils.clamp(this.nightTarget - this.night, -dt / 3, dt / 3)
+    if (!immediate && blend === this.night) return
+    this.night = blend
+    this.sky.copy(daylight.sky).lerp(moonlight.sky, blend)
+    this.fog.color.copy(this.sky)
+    this.ambient.color.copy(daylight.ambient).lerp(moonlight.ambient, blend)
+    this.ambient.groundColor.copy(daylight.ground).lerp(moonlight.ground, blend)
+    this.ambient.intensity = T.MathUtils.lerp(2.12, 1.05, blend)
+    this.sun.color.copy(daylight.sun).lerp(moonlight.sun, blend)
+    this.sun.intensity = T.MathUtils.lerp(1.42, .57, blend)
+    const grid = this.grid.material as T.LineBasicMaterial
+    grid.color.copy(daylight.grid).lerp(moonlight.grid, blend)
   }
 
   private makeGrid() {
@@ -118,6 +169,26 @@ export class TerritoryWorld {
     }
     this.grid.geometry.setFromPoints(points)
     this.bounds.geometry.setFromPoints(this.rectangle(0, 0, this.width, this.height))
+  }
+
+  private updatePathLamps(x: number, z: number) {
+    const nearby = []
+    for (const model of this.houses.values()) {
+      const lamp = lightPathLamp(model, this.night)
+      if (!lamp || this.night === 0) continue
+      const delta = (model.position.x - x) ** 2 + (model.position.z - z) ** 2
+      nearby.push({model, lamp, delta})
+    }
+    nearby.sort((a, b) => a.delta - b.delta)
+    for (const [index, light] of this.lampLights.entries()) {
+      const source = nearby[index]
+      light.visible = !!source
+      if (!source) continue
+      light.position.copy(source.model.position)
+      light.position.y += source.lamp.height
+      light.distance = source.lamp.range
+      light.intensity = source.lamp.intensity * this.night
+    }
   }
 
   private rectangle(x: number, z: number, width: number, height: number) {
@@ -263,6 +334,7 @@ export class TerritoryWorld {
       this.camera.updateProjectionMatrix()
     }
     this.time += dt
+    this.updateLighting(dt)
     const x = position.x * TERRITORY_TILE
     const z = position.y * TERRITORY_TILE
     this.avatar.speed = 0
@@ -283,6 +355,7 @@ export class TerritoryWorld {
     const stepped = this.avatar.animate(dt, this.time, this.snow, this.prints, this.flakes)
     this.residents.update(dt, this.time, x, z, this.snow, this.prints, this.flakes)
     for (const model of this.houses.values()) animateDecoration(model, this.time)
+    this.updatePathLamps(x, z)
     this.prints.update(this.time)
     this.flakes.update(dt, x, z, ground)
     this.renderer.render(this.scene, this.camera)
@@ -292,6 +365,7 @@ export class TerritoryWorld {
   reenter() {
     this.w = 0
     this.h = 0
+    this.updateLighting(0, true)
   }
 
   portrait(saved: PenguinSave, leader: boolean) {
@@ -389,7 +463,8 @@ export class TerritoryWorld {
     const z = center.y * TERRITORY_TILE
     const ground = this.snow.height(x, z)
     const distance = this.camera.position.distanceTo(this.point.set(x, ground, z))
-    this.point.y += info.capacity ? info.size * .56 : buildingKind(house) === 'filter' ? 1.25 : .48
+    this.point.y += info.capacity ? info.size * .56 : house.kind === 'tall-lamp' ? 2 :
+      buildingKind(house) === 'filter' || house.kind === 'snow-lamp' ? 1.25 : .48
     this.point.project(this.camera)
     const cx = (this.point.x + 1) * this.w / 2
     const cy = (1 - this.point.y) * this.h / 2

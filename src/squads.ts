@@ -66,6 +66,7 @@ export class Colonies {
   private projection = new T.Matrix4()
   private testPoint = new T.Vector3()
   private populated = new Set<string>()
+  private schoolHelper?: Penguin
 
   constructor(private scene: T.Scene, private snow: Snowfield, private flakes: SnowParticles,
     private notify: (text: string, sound?: boolean) => void, saved?: ColonySave) {
@@ -205,7 +206,7 @@ export class Colonies {
     p.target.set(p.position.x + Math.sin(angle) * distance, p.position.y + Math.cos(angle) * distance)
   }
 
-  update(dt: number, time: number, input: T.Vector2, camera: T.Camera) {
+  update(dt: number, time: number, input: T.Vector2, camera: T.Camera, hasSchool = false) {
     const player = this.player
     for (const p of this.penguins) p.speed = 0
     const inputStrength = input.length()
@@ -243,10 +244,38 @@ export class Colonies {
       }
       solo.track()
     }
-    this.rest.update(this.party.members, dt, time, moving)
+    if (!hasSchool || !this.waitingSquad) this.schoolHelper = undefined
+    else if (!this.schoolHelper || !this.party.members.includes(this.schoolHelper)) {
+      this.schoolHelper = undefined
+      for (let i = this.party.members.length - 1; i > 0; i--) {
+        const member = this.party.members[i]
+        if (member.species === 'penguin' && member.status === 'follow') {
+          this.schoolHelper = member
+          break
+        }
+      }
+    }
+    this.rest.update(this.schoolHelper ? this.party.members.filter(member => member !== this.schoolHelper) : this.party.members, dt, time, moving)
+    this.sendSchoolHelper(dt, time)
     for (const squad of [...this.squads]) this.updateSquad(squad, dt, time)
     this.keepLargeAnimalsClear()
     this.rollIncidents(dt, time)
+  }
+
+  private sendSchoolHelper(dt: number, time: number) {
+    const helper = this.schoolHelper
+    const waiting = this.waitingSquad
+    const actor = waiting?.incident?.actor
+    if (!helper || !waiting || !actor) return
+    const distance = helper.position.distanceToSquared(actor.position)
+    if (distance > 2 ** 2) {
+      helper.move(actor.position, PLAYER_FOLLOW * 1.35, dt)
+      return
+    }
+    helper.faceToward(actor.position, dt)
+    helper.honk = .6
+    this.rejoin(waiting, time)
+    this.notify('企鵝學校的隊尾企鵝叫回了掉隊的夥伴。')
   }
 
   private populate(time: number) {
@@ -377,6 +406,10 @@ export class Colonies {
 
     for (let i = squad.recallable ? 0 : 1; i < members.length; i++) {
       const current = members[i]
+      if (squad === this.party && current === this.schoolHelper) {
+        current.track()
+        continue
+      }
       if (squad === this.party && this.rest.includes(current)) {
         current.track()
         continue

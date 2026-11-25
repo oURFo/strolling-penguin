@@ -41,6 +41,31 @@ const snowflakeMaterial = new T.MeshBasicMaterial({color: 0xf5fbff})
 const charcoal = new T.MeshStandardMaterial({color: 0x283745, roughness: .86})
 const grilled = new T.MeshStandardMaterial({color: 0xb47035, roughness: .85})
 const orange = new T.MeshStandardMaterial({color: 0xeea14b})
+const lampMetal = new T.MeshStandardMaterial({color: 0x36515f, roughness: .42, metalness: .45})
+const lampGlass = new T.MeshStandardMaterial({color: 0xf3e4bb, roughness: .31})
+const lampGlow = new T.MeshStandardMaterial({color: 0xffd991, emissive: 0xffb955, emissiveIntensity: 2.4})
+const lanternPanel = new T.Shape([
+  new T.Vector2(-.35, -.41), new T.Vector2(.35, -.41),
+  new T.Vector2(.35, .41), new T.Vector2(-.35, .41),
+])
+const penguinCutout = new T.Path()
+penguinCutout.moveTo(0, .29)
+penguinCutout.bezierCurveTo(.17, .29, .19, .13, .16, .045)
+penguinCutout.lineTo(.25, -.11)
+penguinCutout.quadraticCurveTo(.27, -.17, .16, -.13)
+penguinCutout.bezierCurveTo(.15, -.30, .07, -.34, 0, -.29)
+penguinCutout.bezierCurveTo(-.07, -.34, -.15, -.30, -.16, -.13)
+penguinCutout.quadraticCurveTo(-.27, -.17, -.25, -.11)
+penguinCutout.lineTo(-.16, .045)
+penguinCutout.bezierCurveTo(-.19, .13, -.17, .29, 0, .29)
+lanternPanel.holes.push(penguinCutout)
+const lanternCutout = new T.ExtrudeGeometry(lanternPanel, {depth: .045, bevelEnabled: false, curveSegments: 8})
+const schoolGable = new T.Shape()
+schoolGable.moveTo(-1.39, 0)
+schoolGable.lineTo(1.39, 0)
+schoolGable.lineTo(0, .83)
+schoolGable.closePath()
+const schoolRoof = new T.ExtrudeGeometry(schoolGable, {depth: .78, bevelEnabled: false})
 
 function part(group: T.Group, geometry: T.BufferGeometry, material: T.Material, x: number, y: number, z: number, w: number, h: number, d: number) {
   const mesh = new T.Mesh(geometry, material)
@@ -182,10 +207,75 @@ function stallModel(group: T.Group, kind: StallKind) {
   group.userData.vendor = {owner, head, eyes, arm}
 }
 
+function penguinSchool(group: T.Group) {
+  part(group, cube, ice, 0, .21, 0, 6.48, .42, 4.28)
+  part(group, cube, lightIce, 0, 1.67, 0, 6.1, 2.75, 3.9)
+  for (const side of [-1, 1]) {
+    const roof = part(group, cube, pale, side * 1.61, 3.26, 0, 3.63, .24, 4.32)
+    roof.rotation.z = -side * .26
+    part(group, cube, hollow, side * 2.14, 1.97, 1.96, 1.23, 1.08, .12)
+    part(group, cube, festiveGold, side * 2.14, 1.97, 2.04, .075, 1.08, .075)
+    part(group, cube, festiveGold, side * 2.14, 1.97, 2.04, 1.23, .075, .075)
+  }
+  part(group, cube, ice, 0, 2.5, 1.84, 2.48, 3.75, .59)
+  part(group, schoolRoof, pale, 0, 4.35, 1.46, 1, 1, 1)
+  part(group, cube, charcoal, 0, 1.05, 2.16, 1.1, 1.66, .12)
+  part(group, cube, festiveGold, .29, .96, 2.23, .095, .13, .055)
+  part(group, cube, pale, 0, .09, 2.42, 1.77, .18, .61)
+  part(group, round, pale, 0, 3.77, 2.20, .41, .41, .085)
+  part(group, cube, charcoal, 0, 3.86, 2.29, .043, .20, .035)
+  part(group, cube, charcoal, .085, 3.77, 2.29, .18, .045, .035)
+  // A raised penguin crest above the entrance identifies the school.
+  part(group, round, charcoal, 0, 2.76, 2.24, .47, .55, .14)
+  part(group, round, pale, 0, 2.65, 2.38, .36, .37, .06)
+  for (const x of [-.14, .14]) {
+    part(group, round, pale, x, 2.92, 2.365, .14, .15, .045)
+    part(group, round, charcoal, x, 2.92, 2.411, .050, .060, .024)
+  }
+  part(group, round, orange, 0, 2.76, 2.42, .092, .055, .045)
+  part(group, tankCylinder, charcoal, 0, 5.40, 1.83, .045, .84, .045)
+  part(group, cube, festiveRed, .40, 5.66, 1.83, .80, .37, .065)
+}
+
+function pathLamp(group: T.Group, tall: boolean) {
+  const height = tall ? 3.50 : 1.29
+  const width = tall ? .70 : .55
+  const base = tall ? .36 : .31
+  part(group, tankCylinder, lampMetal, 0, .095, 0, base, .19, base)
+  part(group, tankCylinder, lampMetal, 0, height / 2, 0, tall ? .075 : .10, height, tall ? .075 : .10)
+  part(group, tankCylinder, festiveGold, 0, height - .38, 0, .13, .12, .13)
+  part(group, cube, lampMetal, 0, height - .35, 0, width + .12, .12, width + .12)
+  const glass = part(group, cube, lampGlass, 0, height, 0, width * .82, tall ? .79 : .58, width * .82)
+  for (const x of [-1, 1]) for (const z of [-1, 1]) {
+    part(group, cube, lampMetal, x * width * .48, height, z * width * .48, .065, tall ? .80 : .60, .065)
+  }
+  if (tall) {
+    for (let i = 0; i < 4; i++) {
+      const angle = i * Math.PI / 2
+      part(group, lanternCutout, lampMetal, Math.sin(angle) * .347, height, Math.cos(angle) * .347, 1, 1, 1).rotation.y = angle
+    }
+  }
+  part(group, cube, lampMetal, 0, height + .39, 0, width + .19, .13, width + .19)
+  part(group, round, pale, .02, height + .47, -.035, width * .66, .15, width * .64)
+  part(group, round, pale, -width * .41, height + .37, .11, .091, .16, .14)
+  group.userData.lamp = {glass, height, range: tall ? 12 : 7, intensity: tall ? 39 : 23}
+}
+
+export function lightPathLamp(model: T.Group, night: number) {
+  const lamp = model.userData.lamp as {glass: T.Mesh, height: number, range: number, intensity: number} | undefined
+  if (!lamp) return
+  lamp.glass.material = night > .1 ? lampGlow : lampGlass
+  return lamp
+}
+
 export function decorationModel(kind: BuildKind) {
   const group = new T.Group()
   if (isStall(kind)) {
     stallModel(group, kind)
+  } else if (kind === 'school') {
+    penguinSchool(group)
+  } else if (kind === 'snow-lamp' || kind === 'tall-lamp') {
+    pathLamp(group, kind === 'tall-lamp')
   } else if (kind === 'sign') {
     part(group, cube, wood, 0, .55, 0, .16, 1.1, .17)
     part(group, cube, wood, 0, 1.09, .13, 1.25, .55, .16).rotation.z = .04

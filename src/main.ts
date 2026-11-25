@@ -380,7 +380,7 @@ function boot() {
     movement.set(Number(pressed('KeyD', 'ArrowRight')) - Number(pressed('KeyA', 'ArrowLeft')),
       Number(pressed('KeyS', 'ArrowDown')) - Number(pressed('KeyW', 'ArrowUp')))
     movement.addScaledVector(drag, 1 / 42).clampLength(0, 1)
-    colonies.update(dt, time, movement, camera)
+    colonies.update(dt, time, movement, camera, territoryState.houses.some(house => house.kind === 'school'))
     shiftWorld()
     const {x, y: z} = player.position
     const ground = snow.surface(x, z)
