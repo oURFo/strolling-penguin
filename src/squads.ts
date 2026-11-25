@@ -1,8 +1,6 @@
 import * as T from 'three'
-import { Penguin, type PenguinSave } from './penguin'
-import { Seal } from './seal'
-import { Mammoth } from './mammoth'
-import { SaberTooth } from './saber-tooth'
+import type { Penguin, PenguinSave } from './penguin'
+import { createAnimal } from './animals'
 import { RestActivities } from './rest'
 import { type Snowfield, type SnowParticles } from './snow'
 
@@ -136,10 +134,7 @@ export class Colonies {
   }
 
   private add(x: number, z: number, status: Penguin['status'], player = false, seed?: number, species: Penguin['species'] = 'penguin') {
-    const penguin = species === 'mammoth' ? new Mammoth(this.scene, x, z, status, seed)
-      : species === 'saber-tooth' ? new SaberTooth(this.scene, x, z, status, seed)
-      : species === 'seal' ? new Seal(this.scene, x, z, status, seed)
-      : new Penguin(this.scene, x, z, status, player, seed)
+    const penguin = createAnimal(this.scene, x, z, status, player, seed, species)
     this.penguins.add(penguin)
     return penguin
   }
@@ -148,6 +143,28 @@ export class Colonies {
     const penguin = this.add(x, z, 'solo', false, seed, species)
     penguin.nextTurn = time + 1.5 + Math.random() * 5
     this.solos.add(penguin)
+  }
+
+  storeMember(member: Penguin) {
+    const index = this.party.members.indexOf(member)
+    if (index <= 0) return
+    const saved = member.snapshot()
+    this.party.members.splice(index, 1)
+    this.remove(member)
+    return saved
+  }
+
+  releaseMember(saved: PenguinSave, time: number) {
+    const tail = this.party.members[this.party.members.length - 1]
+    const member = this.add(tail.position.x, tail.position.y, 'follow', false, saved.seed, saved.species)
+    const gap = tail.formationRadius + member.formationRadius + .61
+    member.position.set(tail.position.x - Math.sin(tail.angle) * gap, tail.position.y - Math.cos(tail.angle) * gap)
+    member.target.copy(member.position)
+    member.route = [member.position.clone()]
+    member.angle = tail.angle
+    member.protectedUntil = time + 5
+    this.party.members.push(member)
+    return member
   }
 
   private squad(x: number, z: number, followers: number) {

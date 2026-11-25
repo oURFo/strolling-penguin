@@ -37,7 +37,7 @@ export class Snowfield {
 
   private driftMaterial = new T.MeshStandardMaterial({color: 0xf5faff, roughness: .92})
 
-  constructor(private scene: T.Scene) {
+  constructor(private scene: T.Scene, private landOnly = false) {
     const loader = new T.TextureLoader()
     const albedo = loader.load(import.meta.env.BASE_URL + 'textures/snow.webp')
     albedo.colorSpace = T.SRGBColorSpace
@@ -82,6 +82,7 @@ export class Snowfield {
   private elevation(x: number, z: number) {
     const ground = noise(x * .025, z * .025) * .96 + noise(x * .065, z * .065) * .23
       + noise(x * .008 + 20, z * .008) * .55
+    if (this.landOnly) return ground
     const coast = noise(x * .021 + 106, z * .021 - 73) * .76 + noise(x * .008 - 64, z * .008 + 19) * .32
     const ocean = T.MathUtils.smoothstep(coast, .12, .41) * T.MathUtils.smoothstep(Math.hypot(x, z), 13, 24)
     return ground - 4.7 * ocean

@@ -2,6 +2,9 @@ import * as T from 'three'
 import { Footprints, random, Snowfield, SnowParticles, winterSprite, type Print } from './snow'
 import { Colonies, HONK, type ColonySave } from './squads'
 import { GameAudio } from './audio'
+import { SnowCoins } from './coins'
+import { Territory, TerritoryState, type TerritorySave } from './territory'
+import { bindCameraZoom } from './camera-zoom'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -16,19 +19,17 @@ const cameraPercent = get<HTMLOutputElement>('camera-percent')
 const joystick = get('joystick')
 const marks = get('markers')
 const count = get('count')
-const bestNode = get('best')
-const saveKey = 'strolling-penguin-best'
+const companionTotalNode = get('companion-total')
 const strollKey = 'strolling-penguin-stroll'
-const cameraKey = 'strolling-penguin-camera-distance'
 type StrollSave = {
   version: 1
   time: number
   offset: [number, number]
   colonies: ColonySave
   footprints: Print[]
+  territory?: TerritorySave
+  collectedCoins?: string[]
 }
-let best = 1
-try { best = Math.max(1, Number(localStorage.getItem(saveKey)) || 1) } catch { /* Storage may be unavailable. */ }
 
 function readStroll(): StrollSave | undefined {
   try {
@@ -112,12 +113,15 @@ function boot() {
     colonies = new Colonies(scene, snow, particles, notify)
   }
   const player = colonies.player
+  const territoryState = new TerritoryState(saved?.territory)
+  const snowCoins = new SnowCoins(scene, snow, saved?.collectedCoins)
   let nextSave = time + 3
   function saveStroll() {
     const {x, y: z} = player.position
     const state: StrollSave = {
       version: 1, time, offset: snow.offset.toArray(), colonies: colonies.snapshot(),
       footprints: prints.snapshot(time, x, z),
+      territory: territoryState, collectedCoins: [...snowCoins.collected],
     }
     try { localStorage.setItem(strollKey, JSON.stringify(state)) } catch { /* Continue playing without storage. */ }
   }
@@ -133,27 +137,39 @@ function boot() {
   const indicators = new Map<Penguin, HTMLElement>()
   const controls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'Space', 'KeyE'])
   let pointer: number | undefined
-  let nextHonk = 0
-  try {
-    const preference = localStorage.getItem(cameraKey)
-    if (preference !== null) cameraDistance.value = preference
-  } catch { /* Storage may be unavailable. */ }
-  let distanceScale = 1
-  function applyCameraDistance(persist = false) {
-    const percent = T.MathUtils.clamp(cameraDistance.valueAsNumber, 50, 100)
-    cameraPercent.value = percent + '%'
-    cameraDistance.setAttribute('aria-valuetext', percent + '%')
-    distanceScale = percent / 100
-    if (persist) {
-      try { localStorage.setItem(cameraKey, String(percent)) } catch { /* Continue without persistence. */ }
-    }
+  const territoryPage = get('territory')
+  const loading = get('territory-loading')
+  const territory = new Territory(territoryState, () => colonies.party.members,
+    member => colonies.storeMember(member), member => colonies.releaseMember(member, time), saveStroll,
+    renderer, player, activateAudio, () => audio.step())
+  get('open-territory').onclick = () => {
+    keys.clear()
+    resetDrag()
+    saveStroll()
+    game.hidden = true
+    loading.hidden = false
+    window.setTimeout(() => {
+      territory.open()
+      loading.hidden = true
+      territoryPage.hidden = false
+      get('return-snow').focus()
+    }, 480)
   }
-  applyCameraDistance()
-  cameraDistance.addEventListener('input', () => applyCameraDistance())
-  cameraDistance.addEventListener('change', () => applyCameraDistance(true))
+  get('return-snow').onclick = () => {
+    territoryPage.hidden = true
+    territory.close()
+    game.hidden = false
+    game.prepend(renderer.domElement)
+    resize()
+    saveStroll()
+    get('open-territory').focus()
+  }
+  let nextHonk = 0
+  const cameraZoom = bindCameraZoom(cameraDistance, cameraPercent, 'strolling-penguin-camera-distance')
   let zoom = 1
   let initialized = false
   let previousCount = 0
+  let previousTotal = 0
   const waveMaterial = new T.MeshBasicMaterial({color: 0xe58557, transparent: true, depthWrite: false, side: T.DoubleSide})
   const wave = new T.Mesh(new T.RingGeometry(.91, 1, 90).rotateX(-Math.PI / 2), waveMaterial)
   const echo = new T.Mesh(wave.geometry, waveMaterial)
@@ -188,7 +204,7 @@ function boot() {
     help.showModal()
   })
   window.addEventListener('keydown', e => {
-    if (!controls.has(e.code) || help.open || e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
+    if (game.hidden || !controls.has(e.code) || help.open || e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()
     if (!e.repeat) activateAudio()
@@ -199,13 +215,10 @@ function boot() {
   window.addEventListener('blur', () => { keys.clear(); resetDrag() })
   const canvas = renderer.domElement
   canvas.addEventListener('wheel', e => {
-    if (help.open || e.ctrlKey || e.metaKey || e.deltaY === 0) return
-    e.preventDefault()
-    cameraDistance.valueAsNumber = T.MathUtils.clamp(cameraDistance.valueAsNumber + Math.sign(e.deltaY) * 5, 50, 100)
-    applyCameraDistance(true)
+    if (!game.hidden && !help.open) cameraZoom.wheel(e)
   }, {passive: false})
   canvas.addEventListener('pointerdown', e => {
-    if (pointer !== undefined || e.button !== 0 || help.open) return
+    if (game.hidden || pointer !== undefined || e.button !== 0 || help.open) return
     if (e.pointerType === 'mouse') activateAudio()
     pointer = e.pointerId
     start.set(e.clientX, e.clientY)
@@ -235,6 +248,7 @@ function boot() {
   }
 
   function resize() {
+    if (game.hidden) return
     const w = game.clientWidth
     const h = game.clientHeight
     renderer.setSize(w, h, false)
@@ -252,7 +266,7 @@ function boot() {
     const t = initialized ? 1 - Math.exp(-dt * 5.8) : 1
     focus.lerp(view, t)
     const portrait = camera.aspect < .85
-    const desiredZoom = distanceScale * (1 + Math.min(.68, (colonies.party.members.length - 1) * .047))
+    const desiredZoom = cameraZoom.scale * (1 + Math.min(.68, (colonies.party.members.length - 1) * .047))
     zoom = T.MathUtils.lerp(zoom, desiredZoom, t)
     const distance = 2 * zoom * (portrait ? 1.15 : 1)
     camera.position.set(focus.x, focus.y + 9.15 * distance, focus.z + 12.8 * distance)
@@ -328,6 +342,10 @@ function boot() {
   renderer.setAnimationLoop(now => {
     const dt = Math.min(.045, Math.max(.001, (now - previous) / 1000))
     previous = now
+    if (game.hidden) {
+      territory.tick(dt)
+      return
+    }
     if (help.open) return
     time += dt
     const pressed = (...values: string[]) => values.some(key => keys.has(key))
@@ -340,6 +358,11 @@ function boot() {
     const ground = snow.surface(x, z)
     snow.animate(time)
     snow.update(x, z)
+    const pickedCoins = snowCoins.update(x, z, time)
+    if (pickedCoins) {
+      territory.addCoins(pickedCoins)
+      notify(`拾取了 ${pickedCoins} 枚企鵝金幣。`, true)
+    }
     updateCamera(dt)
     for (const p of colonies.penguins) {
       if (!p.animate(dt, time, snow, prints, particles)) continue
@@ -373,11 +396,11 @@ function boot() {
     if (previousCount !== total) {
       previousCount = total
       count.textContent = String(total)
-      if (total > best) {
-        best = total
-        try { localStorage.setItem(saveKey, String(best)) } catch { /* Continue without persistence. */ }
-      }
-      bestNode.textContent = String(best)
+    }
+    const companions = total + territoryState.residentCount
+    if (previousTotal !== companions) {
+      previousTotal = companions
+      companionTotalNode.textContent = String(companions)
     }
     updateMarkers()
     if (time >= nextSave) {

@@ -2,7 +2,7 @@ import * as T from 'three'
 import { type Snowfield, type SnowParticles, type Footprints, random, SEA_LEVEL, softDot } from './snow'
 
 export type Status = 'solo' | 'leader' | 'follow' | 'trip' | 'dream' | 'stray'
-export type RestPose = 'tumble' | 'dream' | 'hop' | 'chat'
+export type RestPose = 'tumble' | 'dream' | 'hop' | 'chat' | 'fish' | 'drink'
 export type PenguinSave = {
   species?: Penguin['species']
   seed: number
@@ -88,7 +88,7 @@ export class Penguin {
   private side = 1
   protected shadow: T.Mesh
   private tilt = 0
-  private chick: boolean
+  readonly chick: boolean
   private gait = 0
   private idleSeed = Math.random() * TAU
   private idleLookIn = .5 + Math.random() * 2
@@ -266,7 +266,7 @@ export class Penguin {
     if (this.species !== 'penguin') this.shadow.quaternion.multiply(heading)
     const sway = Math.sin(this.phase) * this.gait
     this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
-    const pitch = this.honk > 0 ? -.24 : water ? -.47 + Math.sin(this.phase) * .09 : dream ? -.22 + Math.sin(time * 2) * .13
+    const pitch = this.honk > 0 ? -.24 : water ? -.47 + Math.sin(this.phase) * .09 : this.restPose === 'fish' ? .18 + Math.sin(time * 2) * .07 : this.restPose === 'drink' ? .20 : dream ? -.22 + Math.sin(time * 2) * .13
       : chatting ? Math.sin(time * 8 + this.idleSeed) * .13 : idle ? this.idlePitch : -.035
     const yaw = dream ? Math.sin(time * 2.1) * .45 : idle && !chatting ? this.idleYaw : 0
     this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0), blend)
@@ -287,6 +287,8 @@ export class Penguin {
       mesh.position.z = .094 + step * .13
       const paddle = water ? Math.sin(time * (moving ? 11 : 4) + i * Math.PI) * (moving ? .81 : .25) : 0
       this.wings[i].rotation.x = water ? paddle : -step * .34
+      if (this.restPose === 'fish' && i === 1) this.wings[i].rotation.x = -.80 + Math.sin(time * 3) * .12
+      if (this.restPose === 'drink' && i === 1) this.wings[i].rotation.x = -1.18
       const playFlap = water ? .25 + paddle * .48 : this.restPose === 'hop' ? .31 + Math.sin(time * 15) * .24 : 0
       this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : sway * .2 + playFlap + (idle ? breath * .035 : 0)))
     })
