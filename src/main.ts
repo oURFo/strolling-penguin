@@ -5,6 +5,7 @@ import { GameAudio } from './audio'
 import { SnowCoins } from './coins'
 import { Territory, TerritoryState, type TerritorySave } from './territory'
 import { bindCameraZoom } from './camera-zoom'
+import { setupMail } from './mail'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -29,6 +30,7 @@ type StrollSave = {
   footprints: Print[]
   territory?: TerritorySave
   collectedCoins?: string[]
+  claimedMail?: string[]
 }
 
 function readStroll(): StrollSave | undefined {
@@ -114,6 +116,7 @@ function boot() {
   }
   const player = colonies.player
   const territoryState = new TerritoryState(saved?.territory)
+  const claimedMail = new Set(Array.isArray(saved?.claimedMail) ? saved.claimedMail : [])
   const snowCoins = new SnowCoins(scene, snow, saved?.collectedCoins)
   let nextSave = time + 3
   function saveStroll() {
@@ -122,8 +125,14 @@ function boot() {
       version: 1, time, offset: snow.offset.toArray(), colonies: colonies.snapshot(),
       footprints: prints.snapshot(time, x, z),
       territory: territoryState, collectedCoins: [...snowCoins.collected],
+      claimedMail: [...claimedMail],
     }
-    try { localStorage.setItem(strollKey, JSON.stringify(state)) } catch { /* Continue playing without storage. */ }
+    try {
+      const previous = readStroll()?.claimedMail
+      if (Array.isArray(previous) && previous.some(id => !claimedMail.has(id))) return false
+      localStorage.setItem(strollKey, JSON.stringify(state))
+      return true
+    } catch { return false }
   }
   window.addEventListener('pagehide', saveStroll)
   document.addEventListener('visibilitychange', () => { if (document.hidden) saveStroll() })
@@ -142,6 +151,11 @@ function boot() {
   const territory = new Territory(territoryState, () => colonies.party.members,
     member => colonies.storeMember(member), member => colonies.releaseMember(member, time), saveStroll,
     renderer, player, activateAudio, () => audio.step())
+  const mailbox = setupMail(claimedMail, amount => territory.addCoins(amount, false),
+    id => !readStroll()?.claimedMail?.includes(id) && saveStroll(), () => {
+    keys.clear()
+    resetDrag()
+  })
   get('open-territory').onclick = () => {
     keys.clear()
     resetDrag()
@@ -204,7 +218,7 @@ function boot() {
     help.showModal()
   })
   window.addEventListener('keydown', e => {
-    if (game.hidden || !controls.has(e.code) || help.open || e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
+    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()
     if (!e.repeat) activateAudio()

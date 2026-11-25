@@ -15,7 +15,17 @@
     <div class="companion-total"><span class="caption">總夥伴數量</span><b id="companion-total">1</b></div>
   </section>
   <div class="game-controls">
-    <aside class="tools"><button id="open-territory" class="snow-sign"><span class="snow-sign-art" aria-hidden="true"><span class="igloo-icon"></span></span><span>企鵝領地</span></button><button id="sound" aria-pressed="false" aria-label="開啟音樂與音效">♪</button><button id="help" aria-label="玩法說明">?</button></aside>
+    <aside class="tools">
+      <button id="open-territory" class="snow-sign"><span class="snow-sign-art" aria-hidden="true"><span class="igloo-icon"></span></span><span>企鵝領地</span></button>
+      <div id="settings">
+        <button id="settings-toggle" aria-label="選單" aria-expanded="false" aria-controls="settings-options">☰<span class="mail-dot" aria-hidden="true" hidden></span></button>
+        <div id="settings-options" hidden>
+          <button id="sound" aria-pressed="false"><span aria-hidden="true">♪</span> 音樂與音效</button>
+          <button id="open-mail"><span aria-hidden="true">✉</span> 信箱<span class="mail-dot" aria-hidden="true" hidden></span></button>
+        </div>
+      </div>
+      <button id="help" aria-label="玩法說明">?</button>
+    </aside>
     <div class="camera-controls">
       <label for="camera-distance">鏡頭距離</label>
       <output id="camera-percent" for="camera-distance" aria-hidden="true">100%</output>
@@ -35,6 +45,19 @@
     <p>跌倒和發呆的圖示只顯示 2 秒。若 30 秒內沒有呼喚，等待的夥伴會自行組成新隊伍。</p>
     <p>進度會自動存在這個瀏覽器。下次開啟時，會從上次的位置和隊伍繼續散步。</p>
     <form method="dialog"><button>繼續散步</button></form>
+  </dialog>
+  <dialog id="mailbox" aria-labelledby="mailbox-title">
+    <header><h2 id="mailbox-title">信箱</h2><form method="dialog"><button aria-label="關閉信箱">×</button></form></header>
+    <p id="mail-empty">目前沒有可領取的信件。</p>
+    <ul id="mail-list" aria-label="信件主題"></ul>
+    <article id="mail-detail" hidden>
+      <h3 id="mail-subject"></h3>
+      <p id="mail-deadline" hidden></p>
+      <p id="mail-body"></p>
+      <p id="mail-reward"><span class="penguin-coin" aria-hidden="true"></span><span id="mail-reward-label"></span></p>
+      <button id="claim-mail">領取</button>
+    </article>
+    <p id="mail-status" role="status"></p>
   </dialog>
 </main>
 <section id="territory-loading" hidden role="status"><span class="igloo-icon" aria-hidden="true"></span>正在前往企鵝領地…</section>

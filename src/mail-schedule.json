@@ -1,0 +1,13 @@
+[
+  {
+    "body": "現在可以透過右上角企鵝領地進入領地內，建設企鵝家園囉！\n特別贊助企鵝金幣 x 100 讓企鵝增加強大！",
+    "title": "企鵝領地功能開放",
+    "id": "penguin-territory-launch",
+    "expiresAt": "2027-01-01T00:00:00+08:00",
+    "triggerAt": "2026-11-25T02:49:00.7463319+00:00",
+    "reward": {
+      "amount": 100,
+      "kind": "penguin-coins"
+    }
+  }
+]

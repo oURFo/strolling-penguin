@@ -25,3 +25,19 @@ npm run dev
 
 - Square 2 by 2 production texture atlas for an original cozy 3D penguin snow game. Four equal square texture swatches touching, hard quadrant boundaries, no margins or text. Upper left: nearly white fine powdered snow from directly overhead, extremely subtle granules, flat illumination and no identifiable objects, tileable in spirit. Upper right: even charcoal navy fine adult penguin feather down material. Bottom left: pale warm gray fluffy chick down, evenly lit. Bottom right: powder blue watercolor snow grains. Subtle hand-painted gouache, no objects, no gradients across tiles.
 - Square transparent game sprite sheet, three objects on genuine transparent background, in a clear horizontal row with generous empty space between and around all objects. Left third: a wide pale blue distant Antarctic iceberg silhouette with several asymmetric peaks. Middle third: a compact cluster of three translucent blue pointed ice crystals. Right third: low rounded soft white wind-blown snow mound with pale blue shade. Each object fully isolated, no text, no frame, no drop shadow on transparent background, baseline about halfway down the square. Cozy pastel gouache children's-book game props, in soft winter light.
+
+## 信箱排程
+
+使用 `npm run mail:add -- <letter.json>` 新增信件。JSON 格式如下。請為每封信使用唯一 ID，並在觸發時間加上時區。
+
+```json
+{
+  "id": "winter-gift-001",
+  "triggerAt": "2027-01-01T09:00:00+08:00",
+  "title": "雪地來信",
+  "body": "送你一些企鵝金幣。",
+  "reward": { "kind": "penguin-coins", "amount": 25 }
+}
+```
+
+可加上帶時區的 `expiresAt` 來設定停止領取的時間。新增信件時，指令會把已到領取期限的舊信從 `src/mail-schedule.json` 移到 `mail-archive.json`。沒有設定期限的舊信則在已達觸發時間時封存。遊戲只讀取現行排程，領取紀錄與金幣一起保存在瀏覽器。

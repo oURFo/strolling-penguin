@@ -325,10 +325,10 @@ export class Territory {
     }
   }
 
-  addCoins(amount: number) {
+  addCoins(amount: number, save = true) {
     this.state.coins += amount
     this.updateCoins()
-    this.save()
+    if (save) this.save()
   }
 
   private updateCoins() {
