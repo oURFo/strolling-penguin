@@ -6,6 +6,7 @@ import { SnowCoins } from './coins'
 import { Territory, TerritoryState, type TerritorySave } from './territory'
 import { bindCameraZoom } from './camera-zoom'
 import { setupMail } from './mail'
+import { setupSaveSettings } from './save-settings'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -134,8 +135,6 @@ function boot() {
       return true
     } catch { return false }
   }
-  window.addEventListener('pagehide', saveStroll)
-  document.addEventListener('visibilitychange', () => { if (document.hidden) saveStroll() })
   const keys = new Set<string>()
   const movement = new T.Vector2()
   const drag = new T.Vector2()
@@ -151,11 +150,25 @@ function boot() {
   const territory = new Territory(territoryState, () => colonies.party.members,
     member => colonies.storeMember(member), member => colonies.releaseMember(member, time), saveStroll,
     renderer, player, activateAudio, () => audio.step())
-  const mailbox = setupMail(claimedMail, amount => territory.addCoins(amount, false),
-    id => !readStroll()?.claimedMail?.includes(id) && saveStroll(), () => {
+  const settleStallIncome = () => territory.settleStallIncome()
+  settleStallIncome()
+  window.setInterval(settleStallIncome, 1000)
+  function saveOnLeave() {
+    settleStallIncome()
+    saveStroll()
+  }
+  window.addEventListener('pagehide', saveOnLeave)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) saveOnLeave()
+    else settleStallIncome()
+  })
+  const pauseGameInput = () => {
     keys.clear()
     resetDrag()
-  })
+  }
+  const mailbox = setupMail(claimedMail, amount => territory.addCoins(amount, false),
+    id => !readStroll()?.claimedMail?.includes(id) && saveStroll(), pauseGameInput)
+  const saveDialog = setupSaveSettings(pauseGameInput)
   get('open-territory').onclick = () => {
     keys.clear()
     resetDrag()
@@ -218,7 +231,8 @@ function boot() {
     help.showModal()
   })
   window.addEventListener('keydown', e => {
-    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
+    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open ||
+        e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()
     if (!e.repeat) activateAudio()

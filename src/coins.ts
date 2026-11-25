@@ -2,7 +2,7 @@ import * as T from 'three'
 import { random, type Snowfield } from './snow'
 
 const REGION = 20
-const CHANCE = .10
+const CHANCE = .15
 const coinMesh = new T.CylinderGeometry(.34, .34, .085, 24).rotateX(Math.PI / 2)
 const rimMesh = new T.TorusGeometry(.274, .026, 8, 24)
 const gold = new T.MeshStandardMaterial({color: 0xffc645, emissive: 0x7a3902, emissiveIntensity: .27, roughness: .41})

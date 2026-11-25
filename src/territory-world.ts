@@ -4,7 +4,7 @@ import { Penguin, type PenguinSave } from './penguin'
 import { createAnimal } from './animals'
 import { Footprints, Snowfield, SnowParticles } from './snow'
 import { Residents } from './residents'
-import { BUILDINGS, buildingCenter, buildingInfo, buildingKind, type BuildKind, type Building } from './buildings'
+import { BUILDINGS, buildingCenter, buildingFootprint, buildingInfo, buildingKind, type BuildKind, type Building } from './buildings'
 import { animateDecoration, decorationModel } from './decorations'
 
 export const TERRITORY_TILE = 3.1
@@ -79,6 +79,7 @@ export class TerritoryWorld {
   private w = 0
   private h = 0
   private portraits = new Map<string, string>()
+  private buildingThumbnails = new Map<BuildKind, string>()
   private portraitScene?: T.Scene
   private portraitTarget?: T.WebGLRenderTarget
 
@@ -143,8 +144,9 @@ export class TerritoryWorld {
     this.preview.visible = !!cell
     if (this.ghost) this.ghost.visible = !!cell && valid
     if (!cell) return
-    const {size, radius} = BUILDINGS[kind]
-    const outline = size ? this.rectangle(cell.x, cell.y, size, size)
+    const {width, depth} = buildingFootprint(kind, rotation)
+    const {radius} = BUILDINGS[kind]
+    const outline = width ? this.rectangle(cell.x, cell.y, width, depth)
       : this.rectangle(cell.x - radius, cell.y - radius, radius * 2, radius * 2)
     if (this.preview.geometry.getAttribute('position')?.count !== outline.length) {
       this.preview.geometry.dispose()
@@ -157,7 +159,10 @@ export class TerritoryWorld {
     if (!this.ghost || this.ghostKind !== kind) {
       if (this.ghost) {
         this.scene.remove(this.ghost)
-        this.ghost.traverse(object => { if (object instanceof T.Mesh) object.material.dispose() })
+        this.ghost.traverse(object => {
+          if (object instanceof T.InstancedMesh) object.dispose()
+          if (object instanceof T.Mesh) object.material.dispose()
+        })
       }
       this.ghost = this.makeModel(kind)
       this.ghostKind = kind
@@ -178,6 +183,7 @@ export class TerritoryWorld {
     for (const [id, model] of this.houses) {
       if (items.some(house => house.id === id && id !== moving)) continue
       this.scene.remove(model)
+      model.traverse(object => { if (object instanceof T.InstancedMesh) object.dispose() })
       this.houses.delete(id)
     }
     for (const house of items) {
@@ -193,9 +199,9 @@ export class TerritoryWorld {
   }
 
   private placeModel(model: T.Group, cell: PlotCell, kind: BuildKind, rotation: number) {
-    const half = BUILDINGS[kind].size / 2
-    const x = (cell.x + half) * TERRITORY_TILE
-    const z = (cell.y + half) * TERRITORY_TILE
+    const {width, depth} = buildingFootprint(kind, rotation)
+    const x = (cell.x + width / 2) * TERRITORY_TILE
+    const z = (cell.y + depth / 2) * TERRITORY_TILE
     model.position.set(x, this.snow.height(x, z) - (BUILDINGS[kind].capacity ? .13 : 0), z)
     model.rotation.y = rotation * Math.PI / 4
   }
@@ -291,6 +297,35 @@ export class TerritoryWorld {
     const key = `${saved.species ?? 'penguin'}:${saved.seed}:${leader}`
     const cached = this.portraits.get(key)
     if (cached) return cached
+    const scene = this.thumbnailScene()
+    const animal = createAnimal(scene, 0, 0, 'follow', leader, saved.seed, saved.species)
+    try {
+      const url = this.renderThumbnail(scene, animal.root, new T.Vector3(4.1, 2.1, 6.3), 104, .48)
+      this.portraits.set(key, url)
+      if (this.portraits.size > 160) this.portraits.delete(this.portraits.keys().next().value!)
+      return url
+    } finally {
+      animal.dispose(scene)
+    }
+  }
+
+  buildingThumbnail(kind: BuildKind) {
+    const cached = this.buildingThumbnails.get(kind)
+    if (cached) return cached
+    const scene = this.thumbnailScene()
+    const model = this.makeModel(kind)
+    animateDecoration(model, .7, false)
+    scene.add(model)
+    try {
+      const url = this.renderThumbnail(scene, model, new T.Vector3(5, 3.8, 7.5), 208, .50)
+      this.buildingThumbnails.set(kind, url)
+      return url
+    } finally {
+      scene.remove(model)
+    }
+  }
+
+  private thumbnailScene() {
     if (!this.portraitScene) {
       this.portraitScene = new T.Scene()
       this.portraitScene.background = new T.Color(0xe6f4fc)
@@ -299,16 +334,18 @@ export class TerritoryWorld {
       light.position.set(-5, 7, 4)
       this.portraitScene.add(light)
     }
-    const scene = this.portraitScene
-    const animal = createAnimal(scene, 0, 0, 'follow', leader, saved.seed, saved.species)
-    const box = new T.Box3().setFromObject(animal.root)
+    return this.portraitScene
+  }
+
+  private renderThumbnail(scene: T.Scene, model: T.Object3D, view: T.Vector3, size: number, padding: number) {
+    const box = new T.Box3().setFromObject(model)
     const center = box.getCenter(new T.Vector3())
-    const span = box.getSize(new T.Vector3()).length() * .48
+    const span = box.getSize(new T.Vector3()).length() * padding
     const camera = new T.OrthographicCamera(-span, span, span, -span, .1, 30)
-    camera.position.copy(center).add(new T.Vector3(4.1, 2.1, 6.3))
+    camera.position.copy(center).add(view)
     camera.lookAt(center)
-    const size = 104
     const target = this.portraitTarget ??= new T.WebGLRenderTarget(size, size)
+    if (target.width !== size) target.setSize(size, size)
     target.texture.colorSpace = T.SRGBColorSpace
     const previous = this.renderer.getRenderTarget()
     const pixels = new Uint8Array(size * size * 4)
@@ -318,7 +355,6 @@ export class TerritoryWorld {
       this.renderer.readRenderTargetPixels(target, 0, 0, size, size, pixels)
     } finally {
       this.renderer.setRenderTarget(previous)
-      animal.dispose(scene)
     }
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = size
@@ -329,10 +365,7 @@ export class TerritoryWorld {
       image.data.set(pixels.subarray(start, start + size * 4), row * size * 4)
     }
     context.putImageData(image, 0, 0)
-    const url = canvas.toDataURL('image/png')
-    this.portraits.set(key, url)
-    if (this.portraits.size > 160) this.portraits.delete(this.portraits.keys().next().value!)
-    return url
+    return canvas.toDataURL('image/png')
   }
 
   cellAt(x: number, y: number, rect: DOMRect, snap: boolean) {

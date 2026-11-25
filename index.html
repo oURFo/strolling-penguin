@@ -22,6 +22,7 @@
         <div id="settings-options" hidden>
           <button id="sound" aria-pressed="false"><span aria-hidden="true">♪</span> 音樂與音效</button>
           <button id="open-mail"><span aria-hidden="true">✉</span> 信箱<span class="mail-dot" aria-hidden="true" hidden></span></button>
+          <button id="open-save" data-close-settings>存檔</button>
         </div>
       </div>
       <button id="help" aria-label="玩法說明">?</button>
@@ -31,7 +32,7 @@
       <output id="camera-percent" for="camera-distance" aria-hidden="true">100%</output>
       <input id="camera-distance" type="range" min="50" max="100" step="5" value="100">
     </div>
-    <div class="wallet" aria-label="企鵝金幣"><span class="penguin-coin" aria-hidden="true"></span><strong id="snow-coins">0</strong></div>
+    <div class="wallet" aria-label="企鵝金幣"><div class="wallet-balance"><span class="penguin-coin" aria-hidden="true"></span><strong id="snow-coins">0</strong></div><small id="snow-income">每小時 +0 金幣</small></div>
   </div>
   <div id="markers" aria-hidden="true"></div>
   <div id="joystick" aria-hidden="true"><i></i></div>
@@ -59,6 +60,13 @@
     </article>
     <p id="mail-status" role="status"></p>
   </dialog>
+  <dialog id="save-dialog" aria-labelledby="save-title">
+    <header><h2 id="save-title">存檔</h2><form method="dialog"><button aria-label="關閉存檔介面">×</button></form></header>
+    <p id="save-status" role="status">正在確認存檔狀態…</p>
+    <p>遊戲會自動儲存進度。啟用持久儲存後，可降低瀏覽器因空間不足而清除本機存檔的機率。</p>
+    <p class="save-note">保護只適用於目前的瀏覽器和遊戲網址。手動清除網站資料或更換裝置後，無法透過這項功能找回進度。</p>
+    <button id="confirm-persistent-save" type="button" disabled>確認啟用持久儲存</button>
+  </dialog>
 </main>
 <section id="territory-loading" hidden role="status"><span class="igloo-icon" aria-hidden="true"></span>正在前往企鵝領地…</section>
 <main id="territory" hidden aria-label="企鵝領地">
@@ -71,7 +79,7 @@
         <output id="territory-camera-percent" for="territory-camera-distance" aria-hidden="true">100%</output>
         <input id="territory-camera-distance" type="range" min="50" max="100" step="5" value="100">
       </div>
-      <div class="wallet" aria-label="企鵝金幣"><span class="penguin-coin" aria-hidden="true"></span><strong id="territory-coins">0</strong></div>
+      <div class="wallet" aria-label="企鵝金幣"><div class="wallet-balance"><span class="penguin-coin" aria-hidden="true"></span><strong id="territory-coins">0</strong></div><small id="territory-income">每小時 +0 金幣</small></div>
     </div>
   </header>
   <div id="territory-view" aria-label="可行走的領地" tabindex="0"><div id="plot" aria-label="建造用地"></div></div>
@@ -81,11 +89,14 @@
     <button id="edit-territory" aria-pressed="false">編輯領地</button>
     <button id="build-territory" class="territory-icon" aria-label="建設" title="建設"><span aria-hidden="true">＋</span></button>
   </div>
-  <dialog id="build-menu">
-    <h2>建築選單</h2>
+  <dialog id="build-menu" aria-labelledby="build-menu-title">
+    <header class="build-header">
+      <h2 id="build-menu-title">建築選單</h2>
+      <form method="dialog"><button aria-label="關閉建築選單">×</button></form>
+    </header>
     <div id="build-categories" aria-label="建築分類"><button aria-pressed="true">住宅</button><button aria-pressed="false">功能</button><button aria-pressed="false">裝飾</button></div>
-    <div id="build-items"></div>
-    <form method="dialog"><button>關閉</button></form>
+    <div id="build-subcategories" aria-label="建築子分類"><button aria-pressed="true">一般</button><button aria-pressed="false" hidden>聖誕節</button><button aria-pressed="false" hidden>攤販</button></div>
+    <div id="build-items" aria-label="可建造的物件"></div>
   </dialog>
   <dialog id="igloo-edit">
     <h2>編輯小型雪屋</h2>

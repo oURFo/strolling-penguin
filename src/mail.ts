@@ -83,6 +83,9 @@ export function setupMail(claimed: Set<string>, credit: (amount: number) => void
     showMenu(options.hidden)
     render()
   }
+  options.addEventListener('click', event => {
+    if (event.target instanceof Element && event.target.closest('[data-close-settings]')) showMenu(false)
+  }, {capture: true})
   document.addEventListener('pointerdown', event => {
     if (event.target instanceof Node && !get('settings').contains(event.target)) showMenu(false)
   })

@@ -2,7 +2,7 @@ import * as T from 'three'
 import { type Snowfield, type SnowParticles, type Footprints, random, SEA_LEVEL, softDot } from './snow'
 
 export type Status = 'solo' | 'leader' | 'follow' | 'trip' | 'dream' | 'stray'
-export type RestPose = 'tumble' | 'dream' | 'hop' | 'chat' | 'fish' | 'drink'
+export type RestPose = 'tumble' | 'dream' | 'hop' | 'chat' | 'fish' | 'drink' | 'look-up'
 export type PenguinSave = {
   species?: Penguin['species']
   seed: number
@@ -267,7 +267,7 @@ export class Penguin {
     const sway = Math.sin(this.phase) * this.gait
     this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
     const pitch = this.honk > 0 ? -.24 : water ? -.47 + Math.sin(this.phase) * .09 : this.restPose === 'fish' ? .18 + Math.sin(time * 2) * .07 : this.restPose === 'drink' ? .20 : dream ? -.22 + Math.sin(time * 2) * .13
-      : chatting ? Math.sin(time * 8 + this.idleSeed) * .13 : idle ? this.idlePitch : -.035
+      : this.restPose === 'look-up' ? -.38 : chatting ? Math.sin(time * 8 + this.idleSeed) * .13 : idle ? this.idlePitch : -.035
     const yaw = dream ? Math.sin(time * 2.1) * .45 : idle && !chatting ? this.idleYaw : 0
     this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0), blend)
     this.head.rotation.y = T.MathUtils.lerp(this.head.rotation.y, yaw, blend * .65)
