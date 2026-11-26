@@ -556,3 +556,46 @@
   .check-in-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .check-in-penguin:first-child { display: none; }
 }
+
+@media (max-width: 600px) {
+  #game {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-content: start;
+    align-items: start;
+    gap: 6px 8px;
+    padding: max(10px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+  }
+  #game > .masthead, #game > .journal { position: static; }
+  .masthead { grid-area: 1 / 1; align-self: center; }
+  .masthead p { font-size: .55rem; letter-spacing: .075em; }
+  .masthead h1 { font-size: clamp(20px, 5.7vw, 30px); letter-spacing: .05em; }
+  .game-controls { display: contents; }
+  .game-controls > .tools { grid-area: 1 / 2; justify-self: end; gap: 4px; }
+  .game-controls > .camera-controls { grid-area: 2 / 2; justify-self: end; }
+  .game-controls > .wallet { grid-area: 3 / 2; justify-self: end; }
+  .tools .snow-sign { width: 48px; letter-spacing: 0; }
+  .tools .snow-sign-art { width: 45px; height: 32px; }
+  .journal {
+    grid-area: 2 / 1;
+    justify-self: start;
+    align-self: center;
+    gap: 7px;
+    padding: 5px 8px;
+    border-radius: 12px;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .journal .badge, .journal .tally span { display: none; }
+  .journal .caption { display: block; font-size: .64rem; letter-spacing: 0; }
+  .journal .tally { margin-top: 2px; }
+  .journal .tally strong, .journal .companion-total b { font: 700 18px/1 Georgia, serif; }
+  .journal .companion-total { padding-left: 7px; }
+  .journal .companion-total b { margin-top: 2px; }
+  .territory-header { padding-inline: max(9px, env(safe-area-inset-left)) max(9px, env(safe-area-inset-right)); }
+  .territory-header h1 { font-size: clamp(19px, 5.7vw, 28px); white-space: nowrap; }
+  .territory-meters { flex: none; }
+  dialog { max-height: calc(100dvh - 24px); }
+  #instructions { padding: 17px; }
+}
