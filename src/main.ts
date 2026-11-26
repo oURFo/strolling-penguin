@@ -7,6 +7,7 @@ import { Territory, TerritoryState, type TerritorySave } from './territory'
 import { bindCameraZoom } from './camera-zoom'
 import { setupMail } from './mail'
 import { setupSaveSettings } from './save-settings'
+import { recordEventLogin, setupEvents, type CheckIns } from './events'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -32,6 +33,7 @@ type StrollSave = {
   territory?: TerritorySave
   collectedCoins?: string[]
   claimedMail?: string[]
+  eventCheckIns?: CheckIns
 }
 
 function readStroll(): StrollSave | undefined {
@@ -118,6 +120,8 @@ function boot() {
   const player = colonies.player
   const territoryState = new TerritoryState(saved?.territory)
   const claimedMail = new Set(Array.isArray(saved?.claimedMail) ? saved.claimedMail : [])
+  const checkIns: CheckIns = saved?.eventCheckIns ?? {}
+  let savedCheckIns = JSON.stringify(checkIns)
   const snowCoins = new SnowCoins(scene, snow, saved?.collectedCoins)
   let nextSave = time + 3
   function saveStroll() {
@@ -127,11 +131,14 @@ function boot() {
       footprints: prints.snapshot(time, x, z),
       territory: territoryState, collectedCoins: [...snowCoins.collected],
       claimedMail: [...claimedMail],
+      eventCheckIns: checkIns,
     }
     try {
-      const previous = readStroll()?.claimedMail
-      if (Array.isArray(previous) && previous.some(id => !claimedMail.has(id))) return false
+      const previous = readStroll()
+      if (Array.isArray(previous?.claimedMail) && previous.claimedMail.some(id => !claimedMail.has(id))) return false
+      if (JSON.stringify(previous?.eventCheckIns ?? {}) !== savedCheckIns) return false
       localStorage.setItem(strollKey, JSON.stringify(state))
+      savedCheckIns = JSON.stringify(checkIns)
       return true
     } catch { return false }
   }
@@ -169,6 +176,14 @@ function boot() {
   const mailbox = setupMail(claimedMail, amount => territory.addCoins(amount, false),
     id => !readStroll()?.claimedMail?.includes(id) && saveStroll(), pauseGameInput)
   const saveDialog = setupSaveSettings(pauseGameInput)
+  if (recordEventLogin(checkIns)) saveStroll()
+  const {dialog: eventsDialog, refresh: refreshEvents} = setupEvents(pauseGameInput, checkIns, amount => territory.addCoins(amount, false), saveStroll)
+  window.addEventListener('pageshow', event => {
+    if (event.persisted && recordEventLogin(checkIns)) {
+      saveStroll()
+      refreshEvents()
+    }
+  })
   get('open-territory').onclick = () => {
     keys.clear()
     resetDrag()
@@ -231,7 +246,7 @@ function boot() {
     help.showModal()
   })
   window.addEventListener('keydown', e => {
-    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open ||
+    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open || eventsDialog.open ||
         e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()
@@ -374,7 +389,7 @@ function boot() {
       territory.tick(dt)
       return
     }
-    if (help.open) return
+    if (help.open || eventsDialog.open) return
     time += dt
     const pressed = (...values: string[]) => values.some(key => keys.has(key))
     movement.set(Number(pressed('KeyD', 'ArrowRight')) - Number(pressed('KeyA', 'ArrowLeft')),
