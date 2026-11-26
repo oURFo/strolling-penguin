@@ -8,6 +8,7 @@ import { bindCameraZoom } from './camera-zoom'
 import { setupMail } from './mail'
 import { setupSaveSettings } from './save-settings'
 import { recordEventLogin, setupEvents, type CheckIns } from './events'
+import { setupChat } from './chat'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -176,6 +177,7 @@ function boot() {
   const mailbox = setupMail(claimedMail, amount => territory.addCoins(amount, false),
     id => !readStroll()?.claimedMail?.includes(id) && saveStroll(), pauseGameInput)
   const saveDialog = setupSaveSettings(pauseGameInput)
+  const chatDialog = setupChat(pauseGameInput)
   if (recordEventLogin(checkIns)) saveStroll()
   const {dialog: eventsDialog, refresh: refreshEvents} = setupEvents(pauseGameInput, checkIns, amount => territory.addCoins(amount, false), saveStroll)
   window.addEventListener('pageshow', event => {
@@ -246,7 +248,7 @@ function boot() {
     help.showModal()
   })
   window.addEventListener('keydown', e => {
-    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open || eventsDialog.open ||
+    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open || eventsDialog.open || chatDialog.open ||
         e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()

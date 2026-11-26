@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{box-sizing:border-box}body{margin:0;color:#284b60;background:radial-gradient(circle,#fff 1px,transparent 2px) 0 0/24px 21px,linear-gradient(155deg,#eaf7ff,#d5ebf7);font:500 14px/1.5 system-ui,sans-serif}
+main{height:100vh;display:grid;grid-template-rows:minmax(0,1fr) auto auto;gap:8px;padding:10px}
+ol{overflow:auto;overscroll-behavior:contain;margin:0;padding:7px 11px;list-style:none;border:1px solid #b8d8e9;border-radius:12px;background:#fbfeffdc}
+li{padding:7px 10px;margin:4px 0;border-radius:8px;background:#e9f5fc;overflow-wrap:anywhere}li:nth-child(even){background:#f0f8fd}
+li p{margin:2px 0 0;white-space:pre-wrap}time{font-size:12px;color:#526e7f;margin-left:8px}
+.visitor-tag{color:#527282;font-size:12px;font-weight:600;white-space:nowrap}
+#status{margin:0;min-height:1.5em;color:#395c71}
+form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+label:first-child{grid-column:1/-1}label{display:grid;gap:2px;min-width:0}
+input,textarea,button{font:inherit;border:1px solid #adcddd;border-radius:8px;padding:6px 8px;color:inherit}
+input,textarea{width:100%;background:white;font-size:16px}textarea{resize:none}
+button{background:#cde8f6;font-weight:750;align-self:end;cursor:pointer}button:disabled{opacity:.55}
+</style>
+</head>
+<body>
+<main>
+  <ol id="messages" aria-label="最近聊天訊息" tabindex="0"></ol>
+  <p id="status" role="status">正在讀取聊天訊息…</p>
+  <form>
+    <label>暱稱<input id="name" maxlength="20" required></label>
+    <label>公開訊息<textarea id="message" rows="2" maxlength="200" required></textarea></label>
+    <button type="submit">送出</button>
+  </form>
+</main>
+<script>
+(() => {
+  const list = document.getElementById('messages');
+  const name = document.getElementById('name');
+  const text = document.getElementById('message');
+  const status = document.getElementById('status');
+  const form = document.querySelector('form');
+  const submit = form.querySelector('button');
+  const clock = new Intl.DateTimeFormat('zh-TW', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Taipei'});
+  const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  let visitor = crypto.randomUUID();
+  try {
+    const saved = localStorage.getItem('penguin-chat-visitor');
+    if (saved && uuidV4.test(saved)) visitor = saved;
+    localStorage.setItem('penguin-chat-visitor', visitor);
+    name.value = localStorage.getItem('penguin-chat-name') || '';
+  } catch { /* Chat still works when browser storage is blocked. */ }
+  window.addEventListener('message', event => {
+    const gameOrigin = event.origin === 'https://ourfo.github.io' ||
+      /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(event.origin);
+    if (event.source !== window.top || !gameOrigin || event.data?.type !== 'penguin-chat-identity' ||
+        !uuidV4.test(event.data.visitor || '')) return;
+    visitor = event.data.visitor;
+  });
+  if (window.top !== window) window.top.postMessage({type:'penguin-chat-ready'}, '*');
+  const pollInterval = 15000;
+  let timer, sending = false, reading = false, nextDelay = pollInterval, nextPoll = 0, pending;
+  let lastMessage = '';
+  const call = (action, payload) => new Promise((resolve, reject) => {
+    const deadline = setTimeout(() => reject(new Error('timeout')), 15000);
+    const success = value => { clearTimeout(deadline); resolve(value); };
+    const failure = error => {
+      clearTimeout(deadline);
+      console.warn('Chat RPC failed', action, error?.message || error);
+      reject(new Error('rpc'));
+    };
+    try {
+      const runner = google.script.run.withSuccessHandler(success).withFailureHandler(failure);
+      if (action === 'get') runner.getChat();
+      else runner.sendChat(payload);
+    } catch (error) { failure(error); }
+  });
+  function show(messages) {
+    const latest = messages.at(-1)?.id || '';
+    if (lastMessage === latest && list.children.length === messages.length) return;
+    lastMessage = latest;
+    const atEnd = list.scrollHeight - list.clientHeight - list.scrollTop < 36;
+    list.replaceChildren(...messages.map(message => {
+      const row = document.createElement('li');
+      const author = document.createElement('strong');
+      author.textContent = message.name;
+      if (message.tag) {
+        const tag = document.createElement('span');
+        tag.className = 'visitor-tag';
+        tag.textContent = ' #' + message.tag;
+        author.append(tag);
+      }
+      const time = document.createElement('time');
+      time.textContent = clock.format(message.time);
+      const body = document.createElement('p');
+      body.textContent = message.text;
+      row.append(author, time, body);
+      return row;
+    }));
+    if (atEnd) list.scrollTop = list.scrollHeight;
+  }
+  function schedule() {
+    nextPoll = Date.now() + nextDelay + Math.random() * 5000;
+    armPoll();
+  }
+  function armPoll() {
+    clearTimeout(timer);
+    if (!document.hidden) timer = setTimeout(refresh, Math.max(0, nextPoll - Date.now()));
+  }
+  async function refresh() {
+    if (document.hidden || sending || reading) return;
+    reading = true;
+    try {
+      const result = await call('get');
+      if (!result.ok) throw new Error(result.error);
+      if (!sending) show(result.messages);
+      if (!pending && !sending) status.textContent = result.messages.length ? '' : '還沒有訊息。';
+      nextDelay = pollInterval;
+    } catch (error) {
+      if (!pending && !sending) {
+        const reason = {unavailable: '試算表暫時無法讀取', busy: '頻道忙碌',
+          timeout: '回應逾時', rpc: '無法呼叫聊天服務'}[error.message] || '讀取失敗';
+        status.textContent = reason + '，稍後會再試。';
+      }
+      nextDelay = Math.min(60000, nextDelay * 2);
+    } finally {
+      reading = false;
+      schedule();
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearTimeout(timer);
+    else armPoll();
+  });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (sending || !name.value.trim() || !text.value.trim()) return;
+    const payload = {visitor, name: name.value.trim(), text: text.value.trim()};
+    if (pending?.visitor !== payload.visitor || pending?.name !== payload.name || pending?.text !== payload.text) {
+      pending = {...payload, id: crypto.randomUUID()};
+    }
+    sending = true;
+    submit.disabled = true;
+    status.textContent = '正在送出…';
+    try {
+      const result = await call('send', pending);
+      if (!result.ok) {
+        status.textContent = result.error === 'slow' ? '請稍等幾秒再發言。' : '尚未確認送出，請稍後重試。';
+        return;
+      }
+      show(result.messages);
+      if (text.value.trim() === pending.text) text.value = '';
+      try { localStorage.setItem('penguin-chat-name', pending.name); } catch {}
+      pending = undefined;
+      status.textContent = '已送出。';
+    } catch {
+      status.textContent = '尚未確認送出，請稍後重試。';
+    } finally {
+      sending = false;
+      submit.disabled = false;
+      schedule();
+    }
+  });
+  void refresh();
+})();
+</script>
+</body>
+</html>

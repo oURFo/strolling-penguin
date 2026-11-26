@@ -37,7 +37,7 @@
   </div>
   <div id="markers" aria-hidden="true"></div>
   <div id="joystick" aria-hidden="true"><i></i></div>
-  <div class="hint"><span id="message" role="status">靠近落單的動物，邀牠一起散步。</span><small class="desktop">WASD / 方向鍵散步　·　空白鍵呼喚</small><small class="touch">拖曳雪地散步　·　點右下角呼喚</small></div>
+  <div class="hint"><button id="open-chat" type="button" aria-haspopup="dialog" aria-controls="chat-dialog" aria-expanded="false" hidden><i aria-hidden="true"></i>雪地聊天（實驗版）</button><span id="message" role="status">靠近落單的動物，邀牠一起散步。</span><small class="desktop">WASD / 方向鍵散步　·　空白鍵呼喚</small><small class="touch">拖曳雪地散步　·　點右下角呼喚</small></div>
   <div class="call"><button id="honk" aria-label="喇叭嘴呼喚" title="喇叭嘴呼喚"><span aria-hidden="true">◖</span><i></i></button><b>呼喚</b></div>
   <dialog id="instructions">
     <p class="caption">散步指南</p><h2>一起走吧</h2>
@@ -68,6 +68,10 @@
     </header>
     <div id="event-panel" role="tabpanel" tabindex="0"></div>
     <p id="event-status" role="status"></p>
+  </dialog>
+  <dialog id="chat-dialog" aria-labelledby="chat-title">
+    <header><h2 id="chat-title">雪地聊天（實驗版）</h2><form method="dialog"><button aria-label="收起聊天"><span aria-hidden="true">−</span></button></form></header>
+    <div id="chat-content"></div>
   </dialog>
   <dialog id="save-dialog" aria-labelledby="save-title">
     <header><h2 id="save-title">存檔</h2><form method="dialog"><button aria-label="關閉存檔介面">×</button></form></header>

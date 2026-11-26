@@ -552,6 +552,51 @@
 .check-in-reward:disabled { cursor: default; }
 #event-status { margin: 10px 2px 0; color: #365a6e; }
 #event-status:empty { display: none; }
+#open-chat {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 13px;
+  border: 1px solid white;
+  border-radius: 16px 16px 16px 5px;
+  background: linear-gradient(145deg, #fff, #d5edf8);
+  box-shadow: 0 3px 9px #294b6230;
+  font-weight: 800;
+  font-size: .83rem;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+#open-chat i {
+  width: 17px;
+  height: 13px;
+  border: 2px solid #497d95;
+  border-radius: 5px 5px 5px 2px;
+  background: radial-gradient(circle, #497d95 1px, transparent 1.5px) center / 4px 4px repeat-x;
+}
+#chat-dialog {
+  width: min(535px, calc(100% - 24px));
+  max-width: none;
+  padding: 10px;
+  background: linear-gradient(140deg, #f8fdff, #cce6f4);
+}
+#chat-dialog header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 13px;
+  color: white;
+  background: radial-gradient(circle, #d3edf7a0 1px, transparent 1.5px) 0 0 / 24px 21px, linear-gradient(125deg, #224c69, #47839e);
+}
+#chat-dialog h2 { font-size: 22px; text-shadow: 0 1px 4px #19384e; }
+#chat-dialog header button { background: #e4f4fb; color: #214963; padding: 3px 13px; min-height: 34px; font-size: 1.2rem; }
+#chat-frame { display: block; width: 100%; height: min(440px, calc(100dvh - 115px)); border: 1px solid #a9cfe1; border-radius: 12px; background: #f0f9ff; }
 @media (max-width: 480px) {
   .check-in-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .check-in-penguin:first-child { display: none; }
