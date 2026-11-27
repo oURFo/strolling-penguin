@@ -3,7 +3,7 @@ import type { WebGLRenderer } from 'three'
 import { TerritoryWorld, TERRITORY_TILE } from './territory-world'
 import { bindCameraZoom } from './camera-zoom'
 import { ITEMS, type ItemId } from './items'
-import { BUILDINGS, BUILD_SUBCATEGORIES, buildingFootprint, buildingInfo, buildingKind, buildingSubcategory, isStall, rotatesOnGrid, propBlocks, wheelBoardingDistance,
+import { BUILDINGS, BUILD_SUBCATEGORIES, buildingFootprint, buildingInfo, buildingKind, buildingSubcategory, isStall, isInventoryBuilding, rotatesOnGrid, propBlocks, wheelBoardingDistance,
   type Building, type BuildCategory, type BuildKind, type BuildSubcategory, type Cell, type StallKind } from './buildings'
 
 export const TERRITORY_WIDTH = 30
@@ -114,7 +114,7 @@ export class TerritoryState {
     if (moving) {
       Object.assign(moving, cell, {rotation})
     } else {
-      if (item ? ITEMS[item].building !== kind || !this.itemCount(item) : kind === 'christmas-wheel') return false
+      if (item ? ITEMS[item].building !== kind || !this.itemCount(item) : isInventoryBuilding(kind)) return false
       const cost = item ? 0 : BUILDINGS[kind].cost
       if (this.coins < cost) return false
       const id = 1 + this.houses.reduce((max, house) => Math.max(max, house.id), 0)
@@ -499,7 +499,7 @@ export class Territory {
     }
     for (const kind of Object.keys(BUILDINGS) as BuildKind[]) {
       const info = BUILDINGS[kind]
-      if (kind === 'christmas-wheel' || info.category !== this.category || buildingSubcategory(kind) !== this.subcategory) continue
+      if (isInventoryBuilding(kind) || info.category !== this.category || buildingSubcategory(kind) !== this.subcategory) continue
       const card = document.createElement('button')
       card.className = 'build-card'
       const image = document.createElement('img')

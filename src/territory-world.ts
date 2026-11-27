@@ -389,7 +389,7 @@ export class TerritoryWorld {
     this.camera.lookAt(this.focus)
     this.camera.updateMatrixWorld()
     this.residents.update(dt, this.time, x, z, this.snow, this.prints, this.flakes)
-    for (const model of this.houses.values()) animateDecoration(model, this.time)
+    for (const model of this.houses.values()) animateDecoration(model, this.time, true, this.night)
     this.updatePathLamps(x, z)
     this.prints.update(this.time)
     this.flakes.update(dt, x, z, ground)

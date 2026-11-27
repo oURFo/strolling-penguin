@@ -1,6 +1,20 @@
 import type { PenguinSave } from './penguin'
 
+export const CHRISTMAS_STARS = {
+  'christmas-star-red': {color: 0xff526a, size: 1.1},
+  'christmas-star-green': {color: 0x48e698, size: 0.9},
+  'christmas-star-blue': {color: 0x61baff, size: 1.32},
+  'christmas-star-white': {color: 0xfff9ed, size: 0.72},
+} as const
+export const isChristmasStar = (kind: string): kind is keyof typeof CHRISTMAS_STARS =>
+  Object.hasOwn(CHRISTMAS_STARS, kind)
+export const isInventoryBuilding = (kind: BuildKind) => kind === 'christmas-wheel' || isChristmasStar(kind)
+
 export const BUILDINGS = {
+  'christmas-star-red': {name: '聖誕星星（紅）', category: '裝飾', size: 0, radius: 0, capacity: 0, cost: 0},
+  'christmas-star-green': {name: '聖誕星星（綠）', category: '裝飾', size: 0, radius: 0, capacity: 0, cost: 0},
+  'christmas-star-blue': {name: '聖誕星星（藍）', category: '裝飾', size: 0, radius: 0, capacity: 0, cost: 0},
+  'christmas-star-white': {name: '聖誕星星（白）', category: '裝飾', size: 0, radius: 0, capacity: 0, cost: 0},
   'small-igloo': {name: '小型雪屋', category: '住宅', size: 2, radius: 1, capacity: 5, cost: 10},
   'medium-igloo': {name: '中型雪屋', category: '住宅', size: 3, radius: 1.5, capacity: 12, cost: 30},
   sign: {name: '告示牌', category: '裝飾', size: 0, radius: .25, capacity: 0, cost: 3},
@@ -61,6 +75,10 @@ export const TERRITORY_TILE = 3.1
 // Local model units: half width, half depth, then optional forward offset.
 type CollisionPart = readonly [halfWidth: number, halfDepth: number, forward?: number, box?: true]
 const collisionParts: Record<BuildKind, readonly CollisionPart[]> = {
+  'christmas-star-red': [],
+  'christmas-star-green': [],
+  'christmas-star-blue': [],
+  'christmas-star-white': [],
   'small-igloo': [[2.49, 2.23], [.87, 1.04, 1.78]],
   'medium-igloo': [[3.66, 3.28], [1.28, 1.53, 2.62]],
   sign: [[.64, .13, .13, true]], planter: [[.42, .42]],

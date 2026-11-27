@@ -838,3 +838,30 @@
 #instructions details p { margin: 4px 0 0; }
 .guide-footer { justify-content: flex-end; margin-top: 12px; }
 #instructions .guide-footer button { background: #24607a; color: white; }
+#chest-reward {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: max(112px, calc(env(safe-area-inset-bottom) + 92px));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 28px);
+  pointer-events: none;
+  text-align: center;
+  font-weight: 800;
+}
+#chest-reward:not(:empty) {
+  padding: 10px 18px;
+  border: 1px solid #fff2c5;
+  border-radius: 16px;
+  color: #49331c;
+  background: linear-gradient(135deg, #fffdf2, #ffe8ae);
+  box-shadow: 0 6px 22px #69472245;
+  animation: chest-reward-arrive .3s ease-out both;
+}
+@keyframes chest-reward-arrive {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #chest-reward:not(:empty) { animation: none; }
+}

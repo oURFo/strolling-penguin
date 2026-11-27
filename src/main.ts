@@ -10,6 +10,7 @@ import { setupSaveSettings } from './save-settings'
 import { recordEventLogin, setupEvents, type CheckIns } from './events'
 import { setupChat } from './chat'
 import { setupInventory } from './inventory'
+import { ITEMS } from './items'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -34,6 +35,7 @@ type StrollSave = {
   footprints: Print[]
   territory?: TerritorySave
   collectedCoins?: string[]
+  openedChests?: string[]
   claimedMail?: string[]
   eventCheckIns?: CheckIns
 }
@@ -124,7 +126,9 @@ function boot() {
   const claimedMail = new Set(Array.isArray(saved?.claimedMail) ? saved.claimedMail : [])
   const checkIns: CheckIns = saved?.eventCheckIns ?? {}
   let savedCheckIns = JSON.stringify(checkIns)
-  const snowCoins = new SnowCoins(scene, snow, saved?.collectedCoins)
+  const snowCoins = new SnowCoins(scene, snow, saved?.collectedCoins, saved?.openedChests)
+  const chestReward = get('chest-reward')
+  let chestRewardTimer: number | undefined
   let nextSave = time + 3
   function saveStroll() {
     const {x, y: z} = player.position
@@ -132,6 +136,7 @@ function boot() {
       version: 1, time, offset: snow.offset.toArray(), colonies: colonies.snapshot(),
       footprints: prints.snapshot(time, x, z),
       territory: territoryState, collectedCoins: [...snowCoins.collected],
+      openedChests: [...snowCoins.openedChests],
       claimedMail: [...claimedMail],
       eventCheckIns: checkIns,
     }
@@ -451,10 +456,24 @@ function boot() {
     const ground = snow.surface(x, z)
     snow.animate(time)
     snow.update(x, z)
-    const pickedCoins = snowCoins.update(x, z, time)
-    if (pickedCoins) {
-      territory.addCoins(pickedCoins)
-      notify(`拾取了 ${pickedCoins} 枚企鵝金幣。`, true)
+    const {picked, opened} = snowCoins.update(x, z, time)
+    if (picked || opened.length) {
+      let coins = picked
+      for (const reward of opened) {
+        if (reward.kind === 'coins') coins += reward.amount
+        else territoryState.inventory[reward.item] = territoryState.itemCount(reward.item) + 1
+      }
+      territory.addCoins(coins)
+      if (opened.length) {
+        const rewards = opened.map(reward => reward.kind === 'coins'
+          ? `${reward.amount} 枚企鵝金幣` : `${ITEMS[reward.item].name} × 1`)
+        chestReward.textContent = `寶箱獎勵　${rewards.join('、')}`
+        window.clearTimeout(chestRewardTimer)
+        chestRewardTimer = window.setTimeout(() => { chestReward.textContent = '' }, 4400)
+        audio.play('join')
+      } else {
+        notify(`拾取了 ${picked} 枚企鵝金幣。`, true)
+      }
     }
     updateCamera(dt)
     for (const p of colonies.penguins) {

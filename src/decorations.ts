@@ -1,5 +1,6 @@
 import * as T from 'three'
-import { isStall, WHEEL_HEIGHT, WHEEL_PERIOD, WHEEL_RADIUS, WHEEL_SEATS, wheelCabinPosition, type BuildKind, type StallKind } from './buildings'
+import { glowMaterial } from './glow'
+import { CHRISTMAS_STARS, isChristmasStar, isStall, WHEEL_HEIGHT, WHEEL_PERIOD, WHEEL_RADIUS, WHEEL_SEATS, wheelCabinPosition, type BuildKind, type StallKind } from './buildings'
 
 const cube = new T.BoxGeometry(1, 1, 1)
 const pebble = new T.IcosahedronGeometry(1, 0)
@@ -35,6 +36,16 @@ for (let i = 0; i < 10; i++) {
 }
 starShape.closePath()
 const star = new T.ExtrudeGeometry(starShape, {depth: .075, bevelEnabled: false})
+const floatingStar = new T.ExtrudeGeometry(starShape, {
+  depth: .095, bevelEnabled: true, bevelSize: .068, bevelThickness: .078, bevelSegments: 5,
+}).center()
+const starMaterials = new Map(Object.entries(CHRISTMAS_STARS).map(([kind, {color}]) => [
+  kind, {
+    day: new T.MeshStandardMaterial({color, metalness: .14, roughness: .28}),
+    night: new T.MeshStandardMaterial({color, emissive: color, emissiveIntensity: 1.4, roughness: .34}),
+    glow: glowMaterial(color, .78),
+  },
+]))
 const snowflakeCount = 48
 const snowflakeTransform = new T.Object3D()
 const snowflakeMaterial = new T.MeshBasicMaterial({color: 0xf5fbff})
@@ -340,7 +351,18 @@ function christmasWheel(group: T.Group) {
 
 export function decorationModel(kind: BuildKind) {
   const group = new T.Group()
-  if (kind === 'christmas-wheel') {
+  if (isChristmasStar(kind)) {
+    const {size} = CHRISTMAS_STARS[kind]
+    const materials = starMaterials.get(kind)!
+    const mesh = part(group, floatingStar, materials.day, 0, 1.2 + size * .45, 0, size * 2, size * 2, size * 2)
+    mesh.rotation.x = -.16
+    const aura = new T.Sprite(materials.glow)
+    aura.position.copy(mesh.position)
+    aura.scale.setScalar(size * 4.7)
+    aura.visible = false
+    group.add(aura)
+    group.userData.floatingStar = {mesh, aura, materials, height: mesh.position.y}
+  } else if (kind === 'christmas-wheel') {
     christmasWheel(group)
   } else if (isStall(kind)) {
     stallModel(group, kind)
@@ -414,7 +436,14 @@ export function decorationModel(kind: BuildKind) {
   return group
 }
 
-export function animateDecoration(group: T.Group, time: number, particles = true) {
+export function animateDecoration(group: T.Group, time: number, particles = true, night = 0) {
+  const floating = group.userData.floatingStar
+  if (floating) {
+    const {mesh, aura, materials, height} = floating
+    mesh.position.y = aura.position.y = height + Math.sin(time * 1.7 + group.position.x) * .12
+    mesh.material = night > .1 ? materials.night : materials.day
+    aura.visible = night > .1
+  }
   const wheel = group.userData.wheel as {rotor: T.Group, cabins: T.Group[], lights: T.Mesh[]} | undefined
   if (wheel) {
     const turn = time * Math.PI * 2 / WHEEL_PERIOD
