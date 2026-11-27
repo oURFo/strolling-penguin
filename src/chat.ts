@@ -1,4 +1,5 @@
 const visitorKey = 'strolling-penguin-chat-uuid'
+const nicknameKey = 'strolling-penguin-chat-name'
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function chatIdentity() {
@@ -13,6 +14,10 @@ function chatIdentity() {
 
 export function setupChat(pauseInput: () => void) {
   const visitor = chatIdentity()
+  let nickname = ''
+  try {
+    nickname = localStorage.getItem(nicknameKey) ?? ''
+  } catch { /* Keep the nickname in memory for this session. */ }
   const button = document.querySelector<HTMLButtonElement>('#open-chat')!
   const dialog = document.querySelector<HTMLDialogElement>('#chat-dialog')!
   const content = document.querySelector<HTMLElement>('#chat-content')!
@@ -27,7 +32,9 @@ export function setupChat(pauseInput: () => void) {
   const nav = document.querySelector<HTMLElement>('#chat-rooms')!
   let frame: HTMLIFrameElement | undefined
   window.addEventListener('message', event => {
-    if (!dialog.open || event.data?.type !== 'penguin-chat-ready' || !event.source || !('parent' in event.source)) return
+    const type = event.data?.type
+    if (!dialog.open || (type !== 'penguin-chat-ready' && type !== 'penguin-chat-save-name') ||
+        !event.source || !('parent' in event.source)) return
     const {endpoint} = room
     const googleFrame = endpoint.origin === 'https://script.google.com' &&
       /^https:\/\/[^/]+-script\.googleusercontent\.com$/.test(event.origin)
@@ -35,7 +42,16 @@ export function setupChat(pauseInput: () => void) {
     let source = event.source as Window
     for (let depth = 0; depth < 4; depth++) {
       if (source === frame?.contentWindow) {
-        event.source.postMessage({type: 'penguin-chat-identity', visitor}, {targetOrigin: event.origin})
+        if (type === 'penguin-chat-ready') {
+          event.source.postMessage({type: 'penguin-chat-identity', visitor, nickname}, {targetOrigin: event.origin})
+        } else if (typeof event.data.nickname === 'string') {
+          const usedName = event.data.nickname.trim()
+          if (!usedName || usedName.length > 20) return
+          nickname = usedName
+          try {
+            localStorage.setItem(nicknameKey, nickname)
+          } catch { /* The current session can still reuse the nickname. */ }
+        }
         return
       }
       if (source === source.parent) return

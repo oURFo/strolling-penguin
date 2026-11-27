@@ -39,6 +39,9 @@ button{background:#cde8f6;font-weight:750;align-self:end;cursor:pointer}button:d
   const clock = new Intl.DateTimeFormat('zh-TW', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Taipei'});
   const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   let visitor = crypto.randomUUID();
+  let parentOrigin;
+  let nameEdited = false;
+  name.addEventListener('input', () => { nameEdited = true; });
   try {
     const saved = localStorage.getItem('penguin-chat-visitor');
     if (saved && uuidV4.test(saved)) visitor = saved;
@@ -51,6 +54,9 @@ button{background:#cde8f6;font-weight:750;align-self:end;cursor:pointer}button:d
     if (event.source !== window.top || !gameOrigin || event.data?.type !== 'penguin-chat-identity' ||
         !uuidV4.test(event.data.visitor || '')) return;
     visitor = event.data.visitor;
+    parentOrigin = event.origin;
+    if (!nameEdited && typeof event.data.nickname === 'string' && event.data.nickname.trim() &&
+        event.data.nickname.length <= name.maxLength) name.value = event.data.nickname;
   });
   if (window.top !== window) window.top.postMessage({type:'penguin-chat-ready'}, '*');
   const pollInterval = 15000;
@@ -146,6 +152,7 @@ button{background:#cde8f6;font-weight:750;align-self:end;cursor:pointer}button:d
       show(result.messages);
       if (text.value.trim() === pending.text) text.value = '';
       try { localStorage.setItem('penguin-chat-name', pending.name); } catch {}
+      if (parentOrigin) window.top.postMessage({type:'penguin-chat-save-name', nickname:pending.name}, parentOrigin);
       pending = undefined;
       status.textContent = '已送出。';
     } catch {
