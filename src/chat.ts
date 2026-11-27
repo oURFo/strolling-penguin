@@ -46,6 +46,9 @@ export function setupChat(pauseInput: () => void) {
     frame = document.createElement('iframe')
     frame.id = 'chat-frame'
     frame.title = `雪地聊天（實驗版） · 頻道 ${room.number}`
+    // Android Chromium can load public Apps Script rooms without reusing Google sign-in cookies.
+    if (room.endpoint.origin === 'https://script.google.com' && /Android/i.test(navigator.userAgent) &&
+        'credentialless' in frame) frame.setAttribute('credentialless', '')
     frame.src = room.endpoint.href
     content.replaceChildren(frame)
     roomButtons.forEach((option, index) => option.setAttribute('aria-pressed', String(rooms[index] === room)))
