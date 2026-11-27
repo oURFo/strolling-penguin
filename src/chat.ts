@@ -17,12 +17,18 @@ export function setupChat(pauseInput: () => void) {
   const dialog = document.querySelector<HTMLDialogElement>('#chat-dialog')!
   const content = document.querySelector<HTMLElement>('#chat-content')!
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
-  const url = import.meta.env.VITE_CHAT_ROOM_1?.trim() || (local ? 'http://127.0.0.1:4182/room/1' : '')
-  if (!url) return dialog
-  const endpoint = new URL(url, location.href)
+  const rooms = [import.meta.env.VITE_CHAT_ROOM_1, import.meta.env.VITE_CHAT_ROOM_2].flatMap((value, index) => {
+    const number = index + 1
+    const url = value?.trim() || (local ? `http://127.0.0.1:4182/room/${number}` : '')
+    return url ? [{number, endpoint: new URL(url, location.href)}] : []
+  })
+  if (!rooms.length) return dialog
+  let room = rooms[0]
+  const nav = document.querySelector<HTMLElement>('#chat-rooms')!
   let frame: HTMLIFrameElement | undefined
   window.addEventListener('message', event => {
     if (!dialog.open || event.data?.type !== 'penguin-chat-ready' || !event.source || !('parent' in event.source)) return
+    const {endpoint} = room
     const googleFrame = endpoint.origin === 'https://script.google.com' &&
       /^https:\/\/[^/]+-script\.googleusercontent\.com$/.test(event.origin)
     if (event.origin !== endpoint.origin && !googleFrame) return
@@ -36,15 +42,32 @@ export function setupChat(pauseInput: () => void) {
       source = source.parent
     }
   })
+  function loadRoom() {
+    frame = document.createElement('iframe')
+    frame.id = 'chat-frame'
+    frame.title = `雪地聊天（實驗版） · 頻道 ${room.number}`
+    frame.src = room.endpoint.href
+    content.replaceChildren(frame)
+    roomButtons.forEach((option, index) => option.setAttribute('aria-pressed', String(rooms[index] === room)))
+  }
+  const roomButtons = rooms.map(option => {
+    const tab = document.createElement('button')
+    tab.type = 'button'
+    tab.textContent = `頻道 ${option.number}`
+    tab.onclick = () => {
+      if (room === option) return
+      room = option
+      loadRoom()
+    }
+    nav.append(tab)
+    return tab
+  })
+  nav.hidden = rooms.length < 2
   button.hidden = false
   button.onclick = () => {
     pauseInput()
     dialog.showModal()
-    frame = document.createElement('iframe')
-    frame.id = 'chat-frame'
-    frame.title = '雪地聊天（實驗版） · 頻道 1'
-    frame.src = endpoint.href
-    content.append(frame)
+    loadRoom()
     button.setAttribute('aria-expanded', 'true')
   }
   dialog.addEventListener('close', () => {

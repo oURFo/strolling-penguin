@@ -27,6 +27,7 @@ jobs:
       - run: npm run build
         env:
           VITE_CHAT_ROOM_1: ${{ vars.VITE_CHAT_ROOM_1 }}
+          VITE_CHAT_ROOM_2: ${{ vars.VITE_CHAT_ROOM_2 }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

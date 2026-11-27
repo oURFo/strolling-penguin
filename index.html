@@ -17,7 +17,7 @@
   <div class="game-controls">
     <aside class="tools">
       <button id="open-territory" class="snow-sign"><span class="snow-sign-art" aria-hidden="true"><span class="igloo-icon"></span></span><span>企鵝領地</span></button>
-      <button id="open-events" class="snow-sign" aria-haspopup="dialog"><span class="snow-sign-art" aria-hidden="true"><span class="events-icon">❄</span><span class="mail-dot event-dot" hidden></span></span><span>活動</span></button>
+      <button id="open-events" class="snow-sign" aria-haspopup="dialog"><span class="snow-sign-art" aria-hidden="true"><span class="events-icon">❄</span></span><span class="mail-dot event-dot" aria-hidden="true" hidden></span><span>活動</span></button>
       <div id="settings">
         <button id="settings-toggle" aria-label="選單" aria-expanded="false" aria-controls="settings-options">☰<span class="mail-dot" aria-hidden="true" hidden></span></button>
         <div id="settings-options" hidden>
@@ -71,6 +71,7 @@
   </dialog>
   <dialog id="chat-dialog" aria-labelledby="chat-title">
     <header><h2 id="chat-title">雪地聊天（實驗版）</h2><form method="dialog"><button aria-label="收起聊天"><span aria-hidden="true">−</span></button></form></header>
+    <nav id="chat-rooms" aria-label="聊天分流" hidden></nav>
     <div id="chat-content"></div>
   </dialog>
   <dialog id="save-dialog" aria-labelledby="save-title">

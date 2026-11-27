@@ -437,8 +437,8 @@
 #mail-status:empty { display: none; }
 
 .events-icon { color: #327294; font-size: 1.55rem; line-height: 1; text-shadow: 0 1px #fff; }
-#open-events .snow-sign-art { position: relative; }
-.event-dot { top: 1px; right: 2px; z-index: 1; }
+#open-events { position: relative; }
+.event-dot { top: 1px; right: 8px; z-index: 1; }
 #events-dialog {
   width: min(820px, calc(100% - 24px));
   max-width: none;
@@ -596,7 +596,11 @@
 }
 #chat-dialog h2 { font-size: 22px; text-shadow: 0 1px 4px #19384e; }
 #chat-dialog header button { background: #e4f4fb; color: #214963; padding: 3px 13px; min-height: 34px; font-size: 1.2rem; }
+#chat-rooms { display: flex; gap: 6px; margin-bottom: 8px; }
+#chat-rooms button { flex: 1; padding: 5px 8px; border: 1px solid #b7d8e8; border-radius: 9px; background: #edf8ff; }
+#chat-rooms button[aria-pressed=true] { background: #295972; color: white; border-color: #295972; }
 #chat-frame { display: block; width: 100%; height: min(440px, calc(100dvh - 115px)); border: 1px solid #a9cfe1; border-radius: 12px; background: #f0f9ff; }
+#chat-rooms:not([hidden]) + #chat-content #chat-frame { height: min(440px, calc(100dvh - 157px)); }
 @media (max-width: 480px) {
   .check-in-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .check-in-penguin:first-child { display: none; }
