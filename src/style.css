@@ -756,3 +756,85 @@
   white-space: nowrap;
 }
 #building-interact span { margin-left: 4px; font-weight: 500; }
+#instructions {
+  width: min(560px, calc(100% - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: clamp(14px, 4vw, 25px);
+  background: linear-gradient(150deg, #fbfeff, #e3f2fa);
+}
+#instructions header, .guide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+#instructions h2 { font-size: clamp(23px, 5vw, 31px); }
+#instructions header button, #territory-help {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex: none;
+  border: 1px solid white;
+  border-radius: 50%;
+  background: #d8edf7;
+  font-weight: 800;
+}
+#territory-help { width: 30px; height: 30px; }
+.territory-heading { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 600px) {
+  .territory-heading { flex-direction: column; gap: 3px; }
+}
+.guide-card {
+  display: grid;
+  grid-template-columns: minmax(78px, 25%) 1fr;
+  align-items: center;
+  gap: clamp(8px, 3vw, 14px);
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid #c5e0ee;
+  border-radius: 14px;
+  background: #ffffffa8;
+}
+.guide-card h3, .guide-card p { margin: 0; }
+.guide-card p, #instructions details { font-size: .875rem; }
+.guide-art {
+  position: relative;
+  display: flex;
+  min-height: 65px;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  border-radius: 9px;
+  background: linear-gradient(#b9ddf2, #f5fbff);
+}
+.guide-art .badge { width: 26px; height: 30px; flex: none; }
+.guide-art .badge i { width: 18px; height: 22px; }
+.guide-art .igloo-icon { font-size: 23px; }
+.guide-keys { display: grid; justify-items: center; gap: 2px; }
+.guide-keys span { display: flex; gap: 2px; }
+.guide-keys kbd {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: white;
+  box-shadow: 0 2px #89b3c9;
+}
+.guide-arrow { font-size: .85rem; font-weight: 800; }
+.guide-call { padding: 3px; border-radius: 7px; background: #f6b377; color: #512f2a; }
+.guide-grid {
+  position: absolute;
+  inset: 9px;
+  background: repeating-linear-gradient(0deg, #83b6cf 0 1px, transparent 1px 13px),
+    repeating-linear-gradient(90deg, #83b6cf 0 1px, transparent 1px 13px);
+  opacity: .55;
+  transform: skewX(-15deg);
+}
+#instructions details { margin: 10px 0 0; }
+#instructions details p { margin: 4px 0 0; }
+.guide-footer { justify-content: flex-end; margin-top: 12px; }
+#instructions .guide-footer button { background: #24607a; color: white; }

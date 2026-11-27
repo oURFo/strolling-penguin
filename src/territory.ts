@@ -399,7 +399,8 @@ export class Territory {
   }
 
   private menuOpen() {
-    return this.buildMenu.open || this.roster.open || element<HTMLDialogElement>('inventory').open
+    return this.buildMenu.open || this.roster.open || element<HTMLDialogElement>('inventory').open ||
+      element<HTMLDialogElement>('instructions').open
   }
 
   private get placementKind(): BuildKind | undefined {

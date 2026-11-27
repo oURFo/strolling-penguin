@@ -175,6 +175,26 @@ function boot() {
     keys.clear()
     resetDrag()
   }
+  const guideKey = (area: string) => `strolling-penguin-guide-${area}`
+  const guideSeen = new Set<string>()
+  function showGuide(area: 'snow' | 'territory', automatic = false) {
+    if (automatic) {
+      if (guideSeen.has(area)) return
+      try {
+        if (localStorage.getItem(guideKey(area))) return
+      } catch { /* Keep the guide available when storage is disabled. */ }
+    }
+    pauseGameInput()
+    get('snow-guide').hidden = area !== 'snow'
+    get('territory-guide').hidden = area !== 'territory'
+    get('guide-title').textContent = area === 'snow' ? '雪地散步教學' : '企鵝領地教學'
+    get('finish-guide').textContent = area === 'snow' ? '繼續散步' : '探索領地'
+    help.showModal()
+    guideSeen.add(area)
+    try {
+      localStorage.setItem(guideKey(area), '1')
+    } catch { /* The guide remains available through the help button. */ }
+  }
   const mailbox = setupMail(claimedMail, (reward, amount) => {
     if (reward.kind === 'penguin-coins') territory.addCoins(amount, false)
     else territoryState.inventory[reward.item] = territoryState.itemCount(reward.item) + amount
@@ -204,6 +224,7 @@ function boot() {
       loading.hidden = true
       territoryPage.hidden = false
       get('return-snow').focus()
+      showGuide('territory', true)
     }, 480)
   }
   get('return-snow').onclick = () => {
@@ -249,11 +270,8 @@ function boot() {
     audio.toggle()
     syncAudioButton()
   })
-  get('help').addEventListener('click', () => {
-    keys.clear()
-    resetDrag()
-    help.showModal()
-  })
+  get('help').addEventListener('click', () => showGuide('snow'))
+  get('territory-help').addEventListener('click', () => showGuide('territory'))
   window.addEventListener('keydown', e => {
     if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open || eventsDialog.open || chatDialog.open || inventoryDialog.open ||
         e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
@@ -391,6 +409,10 @@ function boot() {
   let previous = performance.now()
   snow.update(player.position.x, player.position.y)
   updateCamera(0)
+  if (!saved) {
+    renderer.render(scene, camera)
+    showGuide('snow', true)
+  }
   renderer.setAnimationLoop(now => {
     const dt = Math.min(.045, Math.max(.001, (now - previous) / 1000))
     previous = now

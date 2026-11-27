@@ -39,15 +39,6 @@
   <div id="joystick" aria-hidden="true"><i></i></div>
   <div class="hint"><button id="open-chat" type="button" aria-haspopup="dialog" aria-controls="chat-dialog" aria-expanded="false" hidden><i aria-hidden="true"></i>雪地聊天（實驗版）</button><span id="message" role="status">靠近落單的動物，邀牠一起散步。</span><small class="desktop">WASD / 方向鍵散步　·　空白鍵呼喚</small><small class="touch">拖曳雪地散步　·　點右下角呼喚</small></div>
   <div class="call"><button class="bag-launch" type="button" aria-label="背包" aria-haspopup="dialog" aria-controls="inventory"><span class="bag-icon" aria-hidden="true"></span></button><button id="honk" aria-label="喇叭嘴呼喚" title="喇叭嘴呼喚"><span aria-hidden="true">◖</span><i></i></button><b>呼喚</b></div>
-  <dialog id="instructions">
-    <p class="caption">散步指南</p><h2>一起走吧</h2>
-    <p>用 WASD、方向鍵或拖曳雪地移動。在落單動物旁停留一秒，牠就會加入隊伍。</p>
-    <p>走到海岸時，隊伍會自動跳入海裡，在透明水面下游泳，靠岸時會跳回雪地。</p>
-    <p>隊友跌倒、發呆或走散時，回到牠附近，按空白鍵、E 或右下角的喇叭呼喚。走散的隊友一旦加入別隊，就會留在那裡。</p>
-    <p>跌倒和發呆的圖示只顯示 2 秒。若 30 秒內沒有呼喚，等待的夥伴會自行組成新隊伍。</p>
-    <p>進度會自動存在這個瀏覽器。下次開啟時，會從上次的位置和隊伍繼續散步。</p>
-    <form method="dialog"><button>繼續散步</button></form>
-  </dialog>
   <dialog id="mailbox" aria-labelledby="mailbox-title">
     <header><h2 id="mailbox-title">信箱</h2><form method="dialog"><button aria-label="關閉信箱">×</button></form></header>
     <p id="mail-empty">目前沒有可領取的信件。</p>
@@ -86,7 +77,10 @@
 <main id="territory" hidden aria-label="企鵝領地">
   <header class="territory-header">
     <button id="return-snow" class="snow-sign"><span class="snow-sign-art" aria-hidden="true"><span class="arctic-icon"></span></span><span>返回北極</span></button>
-    <h1>企鵝領地</h1>
+    <div class="territory-heading">
+      <h1>企鵝領地</h1>
+      <button id="territory-help" type="button" aria-label="領地教學" aria-haspopup="dialog" aria-controls="instructions">?</button>
+    </div>
     <div class="territory-meters">
       <div class="camera-controls">
         <label for="territory-camera-distance">鏡頭距離</label>
@@ -132,6 +126,38 @@
     <form method="dialog"><button>關閉</button></form>
   </dialog>
 </main>
+<dialog id="instructions" aria-labelledby="guide-title">
+  <header>
+    <h2 id="guide-title">新手教學</h2>
+    <form method="dialog"><button aria-label="關閉教學" autofocus>×</button></form>
+  </header>
+  <section id="snow-guide" aria-label="雪地散步教學">
+    <article class="guide-card">
+      <div class="guide-art" aria-hidden="true"><span class="guide-keys"><kbd>↑</kbd><span><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span></span></div>
+      <div><h3>在雪地移動</h3><p>用 WASD 或方向鍵行走，也可以按住雪地拖曳，朝拖曳方向移動。</p></div>
+    </article>
+    <article class="guide-card">
+      <div class="guide-art" aria-hidden="true"><span class="badge"><i></i></span><span class="guide-arrow">→</span><span class="badge"><i></i></span></div>
+      <div><h3>招募落單夥伴</h3><p>靠近落單的動物，留在牠身旁約 1 秒。進度圈填滿後，牠就會加入隊伍。</p></div>
+    </article>
+    <article class="guide-card">
+      <div class="guide-art" aria-hidden="true"><span class="guide-call">◖))</span><span class="badge"><i></i></span></div>
+      <div><h3>呼喚掉隊夥伴</h3><p>夥伴跌倒或發呆時，回到牠附近，按右下角「呼喚」，或按空白鍵、E。頭頂圖示會在 2 秒後消失，等待約 30 秒的夥伴會自行組成新隊伍。</p></div>
+    </article>
+    <details><summary>游泳與自動存檔</summary><p>沿海岸可自動下水或跳回岸上。遊戲會在這個瀏覽器自動儲存進度。</p></details>
+  </section>
+  <section id="territory-guide" aria-label="企鵝領地教學" hidden>
+    <article class="guide-card">
+      <div class="guide-art" aria-hidden="true"><span class="guide-grid"></span><span class="igloo-icon"></span></div>
+      <div><h3>建造第一座雪屋</h3><p>點右下角「＋」開啟建設，選「住宅 → 一般 → 小型雪屋」。小型雪屋花費 10 枚企鵝金幣，佔地 2 × 2 格。點選空地的左上格放置。</p></div>
+    </article>
+    <article class="guide-card">
+      <div class="guide-art" aria-hidden="true"><span class="badge"><i></i></span><span class="guide-arrow">⇄</span><span class="igloo-icon"></span></div>
+      <div><h3>把夥伴安排進空屋</h3><p>結束編輯後，快速點雪屋兩下。從左側隊伍挑選夥伴，按「入住雪屋」。右側會顯示住戶，也可以把牠們加回隊伍。小型雪屋可住 5 位夥伴。</p></div>
+    </article>
+  </section>
+  <form method="dialog" class="guide-footer"><button id="finish-guide">開始散步</button></form>
+</dialog>
 <script type="module" src="/src/main.ts"></script>
 <dialog id="inventory" aria-labelledby="inventory-title">
   <header><h2 id="inventory-title">背包</h2><form method="dialog"><button aria-label="關閉背包">×</button></form></header>
