@@ -1,5 +1,5 @@
 import * as T from 'three'
-import { isStall, type BuildKind, type StallKind } from './buildings'
+import { isStall, WHEEL_HEIGHT, WHEEL_PERIOD, WHEEL_RADIUS, WHEEL_SEATS, wheelCabinPosition, type BuildKind, type StallKind } from './buildings'
 
 const cube = new T.BoxGeometry(1, 1, 1)
 const pebble = new T.IcosahedronGeometry(1, 0)
@@ -268,9 +268,81 @@ export function lightPathLamp(model: T.Group, night: number) {
   return lamp
 }
 
+const wheelRim = new T.TorusGeometry(WHEEL_RADIUS, .105, 7, 48)
+const wheelEntrance = new T.TorusGeometry(1.14, .10, 8, 24, Math.PI)
+const wheelMedallion = new T.TorusGeometry(.60, .071, 8, 24)
+
+function christmasWheel(group: T.Group) {
+  part(group, cube, machine, 0, .12, 0, 8.7, .24, 4.3)
+  part(group, cube, festiveGold, 0, .23, 0, 8.65, .078, 4.26)
+  part(group, cube, pale, 0, .32, 0, 8.52, .15, 4.19)
+  part(group, wheelEntrance, festiveGold, 0, 1.35, 1.78, 1, 1, 1)
+  part(group, star, bulbs[2], 0, 2.58, 1.83, .9, .9, .9)
+  for (const side of [-1, 1]) {
+    part(group, cube, festiveRed, side * 1.14, .87, 1.78, .19, 1.02, .19)
+    for (let stripe = 0; stripe < 4; stripe++) {
+      part(group, cube, pale, side * 1.14, .52 + stripe * .22, 1.79, .21, .079, .21).rotation.z = .30
+    }
+    const tree = new T.Group()
+    christmasTree(tree)
+    tree.scale.setScalar(.37)
+    tree.position.set(side * 3.40, .36, 1.26)
+    group.add(tree)
+    present(group, side * 2.49, .39, 1.43, .52, festiveRed, festiveGold, .23 * side)
+    present(group, side * 2.92, .39, 1.62, .42, evergreen, pale, -.21 * side)
+  }
+  for (const side of [-1, 1]) for (const z of [-.68, .68]) {
+    part(group, cube, machine, side * 1.12, 2.34, z, .28, 4.56, .27).rotation.z = side * .50
+  }
+  const rotor = new T.Group()
+  rotor.position.y = WHEEL_HEIGHT
+  group.add(rotor)
+  for (const z of [-.22, .22]) {
+    part(rotor, wheelRim, festiveRed, 0, 0, z, 1, 1, 1)
+    part(rotor, wheelRim, festiveGold, 0, 0, z + Math.sign(z) * .03, .855, .855, .55)
+  }
+  part(rotor, round, festiveGold, 0, 0, .4, .41, .41, .21)
+  part(rotor, wheelMedallion, festiveGold, 0, 0, .50, 1, 1, 1)
+  part(rotor, star, bulbs[2], 0, 0, .62, 1.52, 1.52, 1)
+  const cabins: T.Group[] = []
+  const lights: T.Mesh[] = []
+  for (const [radius, count] of [[WHEEL_RADIUS, 30], [WHEEL_RADIUS * .855, 18]]) {
+    for (let i = 0; i < count; i++) {
+      const angle = i * Math.PI * 2 / count
+      lights.push(part(rotor, round, bulbs[i % bulbs.length], Math.sin(angle) * radius,
+        Math.cos(angle) * radius, .35, .13, .13, .13))
+    }
+  }
+  for (let i = 0; i < WHEEL_SEATS; i++) {
+    const angle = i * Math.PI * 2 / WHEEL_SEATS
+    part(rotor, cube, lightIce, Math.sin(angle) * WHEEL_RADIUS / 2, Math.cos(angle) * WHEEL_RADIUS / 2,
+      0, .10, WHEEL_RADIUS, .12).rotation.z = -angle
+    const cabin = new T.Group()
+    cabin.scale.set(1.25, 1.28, 1.17)
+    group.add(cabin)
+    cabins.push(cabin)
+    const trim = i % 2 ? evergreen : festiveRed
+    part(cabin, cube, trim, 0, -.48, .24, 1.32, .15, 1.02)
+    part(cabin, cube, trim, 0, -.29, .75, 1.31, .38, .12)
+    part(cabin, cube, festiveGold, 0, -.09, .77, 1.35, .064, .13)
+    part(cabin, star, bulbs[2], 0, -.28, .82, .50, .50, .50)
+    for (const side of [-1, 1]) {
+      part(cabin, cube, machine, side * .60, .13, .70, .09, 1.10, .09)
+      part(cabin, cube, festiveGold, side * .60, .13, -.20, .09, 1.10, .09)
+      part(cabin, cube, trim, side * .60, -.30, .25, .09, .37, .97)
+    }
+    part(cabin, cube, festiveGold, 0, .74, .26, 1.43, .13, 1.10)
+    part(cabin, round, pale, 0, .80, .26, .74, .18, .58)
+  }
+  group.userData.wheel = {rotor, cabins, lights}
+  animateDecoration(group, 0)
+}
+
 export function decorationModel(kind: BuildKind) {
   const group = new T.Group()
-  if (isStall(kind)) {
+  if (kind === 'christmas-wheel') {
+    christmasWheel(group)
+  } else if (isStall(kind)) {
     stallModel(group, kind)
   } else if (kind === 'school') {
     penguinSchool(group)
@@ -343,6 +415,17 @@ export function decorationModel(kind: BuildKind) {
 }
 
 export function animateDecoration(group: T.Group, time: number, particles = true) {
+  const wheel = group.userData.wheel as {rotor: T.Group, cabins: T.Group[], lights: T.Mesh[]} | undefined
+  if (wheel) {
+    const turn = time * Math.PI * 2 / WHEEL_PERIOD
+    wheel.rotor.rotation.z = turn
+    wheel.cabins.forEach((cabin, index) => {
+      const {x, y} = wheelCabinPosition(time, index)
+      // Keep the platform aligned with the rider's feet as the cabin grows upward.
+      cabin.position.set(x, y + .405 * (cabin.scale.y - 1), 0)
+    })
+    wheel.lights.forEach((lamp, index) => lamp.scale.setScalar(.10 + .05 * Math.sin(time * 4 + index * .8)))
+  }
   const vendor = group.userData.vendor
   if (vendor) {
     const phase = time + group.position.x * .37 + group.position.z * .53

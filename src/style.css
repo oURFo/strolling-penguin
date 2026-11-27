@@ -648,3 +648,111 @@
   dialog { max-height: calc(100dvh - 24px); }
   #instructions { padding: 17px; }
 }
+.call { grid-template-columns: auto auto; column-gap: 9px; align-items: center; }
+.call > b { grid-column: 2; }
+.call .bag-launch, .territory-actions .bag-launch {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid white;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fff, #bbdded);
+  color: #295970;
+  box-shadow: 0 3px 8px #345f742e;
+}
+.bag-launch .bag-icon {
+  position: relative;
+  width: 23px;
+  height: 24px;
+  border: 2px solid currentColor;
+  border-radius: 8px 8px 6px 6px;
+  transform: none;
+  background: #78afc5;
+}
+.bag-launch .bag-icon::before {
+  content: "";
+  position: absolute;
+  inset: -6px 5px auto;
+  height: 5px;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+}
+.bag-launch .bag-icon::after {
+  content: "";
+  position: absolute;
+  inset: 10px 3px 3px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: #d4edf9;
+}
+#inventory {
+  width: min(510px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: clamp(12px, 4vw, 20px);
+  background: linear-gradient(145deg, #f9fdff, #d9eef9);
+}
+#inventory header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+#inventory h2 { font-size: 26px; }
+#inventory header button { background: #d5eaf7; color: #254e64; padding: 3px 13px; font-size: 1.25rem; }
+#inventory-categories { display: flex; gap: 6px; }
+#inventory-categories button, #inventory-details button {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid #b6d8e9;
+  border-radius: 10px;
+  background: #f5fbff;
+}
+#inventory-categories button[aria-pressed=true] { background: #285a73; color: white; font-weight: 800; }
+#inventory-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; list-style: none; padding: 0; }
+#inventory-items:empty { display: none; }
+#inventory-items button { width: 100%; aspect-ratio: 1; border: 1px solid #b6d8e9; border-radius: 10px; background: #f5fbff; }
+#inventory-items img { width: 100%; max-width: 48px; aspect-ratio: 1; object-fit: contain; }
+#inventory-empty {
+  display: grid;
+  min-height: 137px;
+  place-items: center;
+  margin: 12px 0 0;
+  border: 1px solid #c2e0ee;
+  border-radius: 12px;
+  color: #45677c;
+  background: radial-gradient(circle, #fff 1px, transparent 2px) 0 0 / 25px 23px, #e8f5fc;
+  font-size: .89rem;
+}
+#inventory-details { padding: 12px; border: 1px solid #b6d8e9; border-radius: 12px; background: #f5fbff; }
+#inventory-details h3 { margin: 0; }
+.inventory-tools { display: flex; justify-content: space-between; gap: 10px; }
+#inventory-details .inventory-tools button { flex: 0 0 auto; min-height: 40px; }
+#inventory-use { margin-left: auto; }
+#inventory-confirm { margin-top: 9px; padding: 9px; border: 1px solid #d5bd9d; border-radius: 9px; background: #fff6e8; }
+#inventory-confirm p { margin: 0 0 7px; }
+#inventory-confirm button + button { margin-left: 6px; }
+#inventory-items button { position: relative; display: grid; place-items: center; padding: 2px; }
+#inventory-items button img { display: block; max-width: none; border-radius: 7px; }
+.inventory-quantity { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 6px; background: #214b66; color: white; font: 800 .76rem/1.5 system-ui, sans-serif; }
+#inventory-details #inventory-sell { background: #a92e40; color: white; border-color: #8b2534; }
+#inventory-details #inventory-sell:hover { background: #8f2636; }
+@media (max-width: 600px) {
+  .call .bag-launch { width: 44px; height: 44px; }
+  #game .hint { max-width: calc(100% - 138px); }
+  .territory-actions { gap: 6px; }
+}
+#building-interact {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(20px, env(safe-area-inset-bottom)) + 112px);
+  z-index: 4;
+  transform: translateX(-50%);
+  padding: 6px 11px;
+  border: 1px solid white;
+  border-radius: 12px;
+  background: #e4f6ff;
+  color: #214d64;
+  box-shadow: 0 3px 12px #29485b40;
+  font-weight: 800;
+  font-size: .85rem;
+  white-space: nowrap;
+}
+#building-interact span { margin-left: 4px; font-weight: 500; }

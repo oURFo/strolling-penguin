@@ -2,7 +2,8 @@ import type { Penguin, PenguinSave } from './penguin'
 import type { WebGLRenderer } from 'three'
 import { TerritoryWorld, TERRITORY_TILE } from './territory-world'
 import { bindCameraZoom } from './camera-zoom'
-import { BUILDINGS, BUILD_SUBCATEGORIES, buildingFootprint, buildingInfo, buildingKind, buildingSubcategory, isStall, propBlocks,
+import { ITEMS, type ItemId } from './items'
+import { BUILDINGS, BUILD_SUBCATEGORIES, buildingFootprint, buildingInfo, buildingKind, buildingSubcategory, isStall, rotatesOnGrid, propBlocks, wheelBoardingDistance,
   type Building, type BuildCategory, type BuildKind, type BuildSubcategory, type Cell, type StallKind } from './buildings'
 
 export const TERRITORY_WIDTH = 30
@@ -10,22 +11,24 @@ export const TERRITORY_HEIGHT = 24
 const WIDTH = TERRITORY_WIDTH
 const HEIGHT = TERRITORY_HEIGHT
 const STALL_HOUR = 60 * 60 * 1000
-export type TerritorySave = {coins: number, houses: Building[], position?: Cell, pondGrid?: true}
+export type TerritorySave = {coins: number, houses: Building[], position?: Cell, pondGrid?: true, inventory?: Partial<Record<ItemId, number>>}
 const speciesNames = {penguin: '企鵝', seal: '海豹', mammoth: '長毛象', 'saber-tooth': '劍齒虎'}
 const clampWalk = (value: number, maximum: number) => Math.max(.39, Math.min(maximum - .39, value))
-const turn = (rotation = 0, kind?: BuildKind) => (rotation + (isStall(kind) ? 2 : 1)) % 8
+const turn = (rotation = 0, kind?: BuildKind) => (rotation + (rotatesOnGrid(kind) ? 2 : 1)) % 8
 
 export class TerritoryState {
   readonly pondGrid = true
   coins: number
   houses: Building[]
   position: Cell
+  inventory: Partial<Record<ItemId, number>>
 
   get residentCount() {
     return this.houses.reduce((total, house) => total + house.residents.length, 0)
   }
 
   constructor(saved?: TerritorySave) {
+    this.inventory = {...saved?.inventory}
     this.coins = Number.isSafeInteger(saved?.coins) ? Math.max(0, saved!.coins) : 0
     this.houses = Array.isArray(saved?.houses) ? saved.houses : []
     const savedPosition = saved?.position
@@ -72,14 +75,7 @@ export class TerritoryState {
   }
 
   private walkable(x: number, y: number, from?: Cell) {
-    return !this.houses.some(h => {
-      const {size, capacity} = buildingInfo(h)
-      return capacity ? this.touchesPlayer(h, size, x, y) : propBlocks(h, x, y, from?.x, from?.y)
-    })
-  }
-
-  private touchesPlayer(cell: Cell, width: number, x: number, y: number, depth = width) {
-    return x > cell.x - .24 && x < cell.x + width + .24 && y > cell.y - .20 && y < cell.y + depth + .25
+    return !this.houses.some(h => propBlocks(h, x, y, from?.x, from?.y))
   }
 
   enterAtCenter() {
@@ -104,7 +100,7 @@ export class TerritoryState {
     const {width, depth} = buildingFootprint(kind, rotation)
     const {radius} = BUILDINGS[kind]
     if (!width) return x >= radius && x <= WIDTH - radius && y >= radius && y <= HEIGHT - radius
-    return (!isStall(kind) || rotation % 2 === 0) && Number.isInteger(x) && Number.isInteger(y) &&
+    return (!rotatesOnGrid(kind) || rotation % 2 === 0) && Number.isInteger(x) && Number.isInteger(y) &&
       x >= 0 && x <= WIDTH - width && y >= 0 && y <= HEIGHT - depth
       && !this.houses.some(h => {
         const other = buildingFootprint(buildingKind(h), h.rotation)
@@ -113,18 +109,20 @@ export class TerritoryState {
       })
   }
 
-  place(cell: Cell, kind: BuildKind, moving?: Building, rotation = moving?.rotation ?? 0) {
+  place(cell: Cell, kind: BuildKind, moving?: Building, rotation = moving?.rotation ?? 0, item?: ItemId) {
     if (!this.canPlace(cell, kind, moving, rotation)) return false
     if (moving) {
       Object.assign(moving, cell, {rotation})
     } else {
-      const cost = BUILDINGS[kind].cost
+      if (item ? ITEMS[item].building !== kind || !this.itemCount(item) : kind === 'christmas-wheel') return false
+      const cost = item ? 0 : BUILDINGS[kind].cost
       if (this.coins < cost) return false
       const id = 1 + this.houses.reduce((max, house) => Math.max(max, house.id), 0)
-      const building: Building = {...cell, id, kind, rotation, residents: []}
+      const building: Building = {...cell, id, kind, rotation, residents: [], inventoryItem: item}
       if (isStall(kind)) building.stallPaidThrough = Date.now()
       this.houses.push(building)
       this.coins -= cost
+      if (item) this.inventory[item] = this.itemCount(item) - 1
     }
     return true
   }
@@ -132,16 +130,15 @@ export class TerritoryState {
   rotate(house: Building) {
     const kind = buildingKind(house)
     const rotation = turn(house.rotation, kind)
-    if (isStall(kind) && !this.canPlace(house, kind, house, rotation)) return false
+    if (rotatesOnGrid(kind) && !this.canPlace(house, kind, house, rotation)) return false
     house.rotation = rotation
     return true
   }
 
   canPlace(cell: Cell, kind: BuildKind, moving?: Building, rotation = moving?.rotation ?? 0) {
     const {x, y} = this.position
-    const {width, depth} = buildingFootprint(kind, rotation)
     return (!!moving || !this.ownsStall(kind)) && this.fits(cell, kind, moving, rotation) &&
-      (!width || !this.touchesPlayer(cell, width, x, y, depth))
+      (!BUILDINGS[kind].size || !propBlocks({...cell, kind, rotation}, x, y))
   }
 
   ownsStall(kind: BuildKind) {
@@ -149,10 +146,27 @@ export class TerritoryState {
   }
 
   recycle(house: Building, returnMember: (saved: PenguinSave) => void) {
+    if (!this.houses.includes(house)) return
     this.settleStallIncome()
     this.houses = this.houses.filter(h => h !== house)
     for (const member of house.residents) returnMember(member)
-    this.coins += buildingInfo(house).cost
+    const item = house.inventoryItem
+    if (item && Object.hasOwn(ITEMS, item)) {
+      const id = item as ItemId
+      this.inventory[id] = this.itemCount(id) + 1
+    } else this.coins += buildingInfo(house).cost
+  }
+
+  itemCount(item: ItemId) {
+    const count = this.inventory[item] ?? 0
+    return Number.isSafeInteger(count) && count > 0 ? count : 0
+  }
+
+  sellItem(item: ItemId) {
+    if (!this.itemCount(item)) return false
+    this.inventory[item] = this.itemCount(item) - 1
+    this.coins += ITEMS[item].sellPrice
+    return true
   }
 
   settleStallIncome(now = Date.now()) {
@@ -190,6 +204,7 @@ export class Territory {
   private keys = new Set<string>()
   private drag?: {id: number, startX: number, startY: number, x: number, y: number}
   private hint = element('territory-hint')
+  private interact = element<HTMLButtonElement>('building-interact')
   private buildMenu = element<HTMLDialogElement>('build-menu')
   private editMenu = element<HTMLDialogElement>('igloo-edit')
   private roster = element<HTMLDialogElement>('igloo-roster')
@@ -206,6 +221,7 @@ export class Territory {
   private editButton = element<HTMLButtonElement>('edit-territory')
   private editing = false
   private placement?: BuildKind | Building
+  private placementItem?: ItemId
   private category: BuildCategory = '住宅'
   private subcategory: BuildSubcategory = '一般'
   private rotation = 0
@@ -217,6 +233,13 @@ export class Territory {
     private renderer: WebGLRenderer, private player: Penguin,
     private activateAudio: () => void, private stepAudio: () => void) {
     this.enableMovement()
+    this.interact.onclick = () => {
+      const wheel = this.nearbyWheel()
+      if (!wheel || !this.world?.boardWheel(wheel)) return
+      this.interact.hidden = true
+      this.hint.textContent = '搭乘中 · 按方向鍵、WASD 或拖曳即可下車。'
+      this.view.focus()
+    }
     const angleKey = 'strolling-penguin-territory-camera-angle'
     try {
       const value = localStorage.getItem(angleKey)
@@ -263,6 +286,7 @@ export class Territory {
     }
     element('move-igloo').onclick = () => {
       this.placement = this.selected
+      this.placementItem = undefined
       this.rotation = this.selected?.rotation ?? 0
       this.editMenu.close()
       this.render()
@@ -287,16 +311,38 @@ export class Territory {
     this.state.enterAtCenter()
     this.world ??= new TerritoryWorld(this.renderer, this.player, WIDTH, HEIGHT)
     this.world.reenter()
+    this.world.leaveWheel()
     this.view.prepend(this.renderer.domElement)
     this.editing = false
     this.placement = undefined
     this.render()
   }
 
+  inventoryThumbnail(item: ItemId) {
+    this.world ??= new TerritoryWorld(this.renderer, this.player, WIDTH, HEIGHT)
+    return this.world.buildingThumbnail(ITEMS[item].building)
+  }
+
   close() {
     this.keys.clear()
     this.drag = undefined
     if (this.page.hidden && this.editMenu.open) this.editMenu.close()
+  }
+
+  useInventoryItem(item: ItemId) {
+    if (this.page.hidden || !this.state.itemCount(item)) return false
+    this.placementItem = item
+    this.placement = ITEMS[item].building
+    this.rotation = 0
+    this.render()
+    return true
+  }
+
+  sellInventoryItem(item: ItemId) {
+    if (!this.state.sellItem(item)) return false
+    this.updateCoins()
+    this.save()
+    return true
   }
 
   private enableMovement() {
@@ -307,6 +353,7 @@ export class Territory {
         event.altKey || event.ctrlKey || event.metaKey) return
       event.preventDefault()
       if (!event.repeat) this.activateAudio()
+      if (this.world?.riding) this.stopRide()
       this.keys.add(event.code)
     })
     window.addEventListener('keyup', event => this.keys.delete(event.code))
@@ -352,7 +399,7 @@ export class Territory {
   }
 
   private menuOpen() {
-    return this.buildMenu.open || this.roster.open
+    return this.buildMenu.open || this.roster.open || element<HTMLDialogElement>('inventory').open
   }
 
   private get placementKind(): BuildKind | undefined {
@@ -361,6 +408,25 @@ export class Territory {
 
   private get moving() {
     return typeof this.placement === 'object' ? this.placement : undefined
+  }
+
+  private nearbyWheel() {
+    if (this.editing || this.placement || this.menuOpen() || this.world?.riding) return
+    let nearest: Building | undefined
+    let distance = 2.2
+    for (const house of this.state.houses) {
+      if (house.kind !== 'christmas-wheel') continue
+      const gap = wheelBoardingDistance(house, this.state.position)
+      if (gap > distance) continue
+      nearest = house
+      distance = gap
+    }
+    return nearest
+  }
+
+  private stopRide() {
+    this.world?.leaveWheel()
+    this.hint.textContent = '已下車。用方向鍵、WASD 或拖曳散步。'
   }
 
   tick(dt: number) {
@@ -381,11 +447,13 @@ export class Territory {
     const y = position.y
     const angle = this.cameraAngle.valueAsNumber * Math.PI / 180
     if (Math.hypot(dx, dy) > .065) {
+      if (this.world?.riding) this.stopRide()
       const pace = 3.45 * .75 / TERRITORY_TILE
       this.state.walk((dx * Math.cos(angle) + dy * Math.sin(angle)) * dt * pace,
         (dy * Math.cos(angle) - dx * Math.sin(angle)) * dt * pace)
     }
     if (!this.world) return
+    this.interact.hidden = !this.nearbyWheel()
     if (this.world.render(this.view, position, position.x - x, position.y - y, dt, this.zoom.scale, angle)) this.stepAudio()
     for (const [house, spot] of this.spots) {
       const point = this.world.project(house)
@@ -430,7 +498,7 @@ export class Territory {
     }
     for (const kind of Object.keys(BUILDINGS) as BuildKind[]) {
       const info = BUILDINGS[kind]
-      if (info.category !== this.category || buildingSubcategory(kind) !== this.subcategory) continue
+      if (kind === 'christmas-wheel' || info.category !== this.category || buildingSubcategory(kind) !== this.subcategory) continue
       const card = document.createElement('button')
       card.className = 'build-card'
       const image = document.createElement('img')
@@ -462,6 +530,7 @@ export class Territory {
       card.onclick = () => {
         this.buildMenu.close()
         this.placement = kind
+        this.placementItem = undefined
         this.rotation = 0
         this.render()
         this.view.focus()
@@ -489,27 +558,29 @@ export class Territory {
   private placeSelected() {
     const kind = this.placementKind
     if (!this.cursor || !kind) return
-    if (!this.state.place(this.cursor, kind, this.moving, this.rotation)) return
+    if (!this.state.place(this.cursor, kind, this.moving, this.rotation, this.placementItem)) return
     this.placement = undefined
+    this.placementItem = undefined
     this.changed()
   }
 
   private updateRotation() {
     const placement = element('rotate-placement')
     placement.hidden = this.placement === undefined
-    placement.textContent = `旋轉 ${isStall(this.placementKind) ? 90 : 45}° · ${this.rotation * 45}°`
-    element('rotate-igloo').textContent = `旋轉 ${isStall(this.selected?.kind) ? 90 : 45}° · ${(this.selected?.rotation ?? 0) * 45}°`
+    placement.textContent = `旋轉 ${rotatesOnGrid(this.placementKind) ? 90 : 45}° · ${this.rotation * 45}°`
+    element('rotate-igloo').textContent = `旋轉 ${rotatesOnGrid(this.selected?.kind) ? 90 : 45}° · ${(this.selected?.rotation ?? 0) * 45}°`
     if (this.selected) {
       const info = buildingInfo(this.selected)
       this.editMenu.querySelector('h2')!.textContent = '編輯' + info.name
       element('move-igloo').textContent = '移動' + info.name
-      element('recycle-igloo').textContent = `回收 · 還 ${info.cost} 金幣`
+      element('recycle-igloo').textContent = this.selected.inventoryItem ? '回收 · 返還背包' : `回收 · 還 ${info.cost} 金幣`
     }
   }
 
   private render() {
     const placing = this.placement !== undefined
     const kind = this.placementKind
+    if (placing || this.editing) this.world?.leaveWheel()
     const info = kind && BUILDINGS[kind]
     const footprint = kind && buildingFootprint(kind, this.rotation)
     this.board.replaceChildren()

@@ -182,6 +182,17 @@ export class Penguin {
     if (look.lengthSq() > .0001) this.turn(Math.atan2(look.x, look.y), dt)
   }
 
+  showInCabin(x: number, y: number, z: number, angle: number) {
+    this.root.position.set(x, y, z)
+    this.root.rotation.set(0, angle, 0)
+    if (this.species === 'penguin') {
+      this.body.rotation.set(0, 0, 0)
+      this.head.rotation.set(-.13, 0, 0)
+    }
+    this.root.scale.setScalar(Math.min(1, .62 / this.formationRadius))
+    this.shadow.visible = false
+  }
+
   private turn(angle: number, dt: number) {
     const difference = Math.atan2(Math.sin(angle - this.angle), Math.cos(angle - this.angle))
     this.angle += difference * Math.min(dt * 11, 1)

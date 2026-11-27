@@ -4,10 +4,10 @@ import { Penguin, type PenguinSave } from './penguin'
 import { createAnimal } from './animals'
 import { Footprints, Snowfield, SnowParticles } from './snow'
 import { Residents } from './residents'
-import { BUILDINGS, buildingCenter, buildingFootprint, buildingInfo, buildingKind, type BuildKind, type Building } from './buildings'
+import { BUILDINGS, buildingCenter, buildingFootprint, buildingInfo, buildingKind, TERRITORY_TILE, WHEEL_SEATS, wheelCabinPosition, type BuildKind, type Building } from './buildings'
 import { animateDecoration, decorationModel, lightPathLamp } from './decorations'
 
-export const TERRITORY_TILE = 3.1
+export { TERRITORY_TILE } from './buildings'
 const WALK = 3.45 * .75
 const ice = new T.MeshStandardMaterial({vertexColors: true, color: 0xe2faff, roughness: .44})
 const mortar = new T.MeshStandardMaterial({color: 0x82abc3, roughness: .85})
@@ -250,7 +250,7 @@ export class TerritoryWorld {
   }
 
   syncHouses(items: Building[], moving?: number) {
-    this.residents.sync(items, this.time)
+    this.residents.sync(moving === undefined ? items : items.filter(item => item.id !== moving), this.time)
     for (const [id, model] of this.houses) {
       if (items.some(house => house.id === id && id !== moving)) continue
       this.scene.remove(model)
@@ -322,6 +322,29 @@ export class TerritoryWorld {
     return model
   }
 
+  get riding() { return !!this.residents.playerRide }
+
+  boardWheel(building: Building) {
+    if (!this.houses.has(building.id)) return false
+    let seat = -1
+    let height = Infinity
+    for (let i = 0; i < WHEEL_SEATS; i++) {
+      const position = wheelCabinPosition(this.time, i)
+      if (position.y >= height || this.residents.wheelSeatInUse(building, i)) continue
+      seat = i
+      height = position.y
+    }
+    if (seat < 0) return false
+    this.residents.playerRide = {building, seat}
+    return true
+  }
+
+  leaveWheel() {
+    if (!this.riding) return
+    this.residents.playerRide = undefined
+    this.avatar.root.scale.setScalar(1)
+  }
+
   render(view: HTMLElement, position: PlotCell, dx: number, dy: number, dt: number, zoom: number, angle: number) {
     const w = view.clientWidth, h = view.clientHeight
     if (w < 1 || h < 1) return false
@@ -347,12 +370,24 @@ export class TerritoryWorld {
     const ground = this.snow.height(x, z)
     this.snow.update(x, z)
     this.focus.set(x, ground + .26, z - 2.4)
+    const stepped = this.avatar.animate(dt, this.time, this.snow, this.prints, this.flakes)
+    const ride = this.residents.playerRide
+    if (ride) {
+      const model = this.houses.get(ride.building.id)
+      if (!model) this.leaveWheel()
+      else {
+        const cabin = wheelCabinPosition(this.time, ride.seat)
+        const heading = model.rotation.y
+        this.point.set(cabin.x, cabin.y - .39, .23).applyAxisAngle(T.Object3D.DEFAULT_UP, heading).add(model.position)
+        this.avatar.showInCabin(this.point.x, this.point.y, this.point.z, angle)
+        this.focus.set(this.point.x, this.point.y + .55, this.point.z)
+      }
+    }
     const distance = 2 * zoom * (this.camera.aspect < .85 ? 1.15 : 1)
     this.camera.position.set(this.focus.x + Math.sin(angle) * 12.8 * distance,
-      this.focus.y + 9.15 * distance, this.focus.z + Math.cos(angle) * 12.8 * distance)
+      this.focus.y + (this.riding ? 4.4 : 9.15) * distance, this.focus.z + Math.cos(angle) * 12.8 * distance)
     this.camera.lookAt(this.focus)
     this.camera.updateMatrixWorld()
-    const stepped = this.avatar.animate(dt, this.time, this.snow, this.prints, this.flakes)
     this.residents.update(dt, this.time, x, z, this.snow, this.prints, this.flakes)
     for (const model of this.houses.values()) animateDecoration(model, this.time)
     this.updatePathLamps(x, z)

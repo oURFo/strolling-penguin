@@ -38,7 +38,7 @@
   <div id="markers" aria-hidden="true"></div>
   <div id="joystick" aria-hidden="true"><i></i></div>
   <div class="hint"><button id="open-chat" type="button" aria-haspopup="dialog" aria-controls="chat-dialog" aria-expanded="false" hidden><i aria-hidden="true"></i>雪地聊天（實驗版）</button><span id="message" role="status">靠近落單的動物，邀牠一起散步。</span><small class="desktop">WASD / 方向鍵散步　·　空白鍵呼喚</small><small class="touch">拖曳雪地散步　·　點右下角呼喚</small></div>
-  <div class="call"><button id="honk" aria-label="喇叭嘴呼喚" title="喇叭嘴呼喚"><span aria-hidden="true">◖</span><i></i></button><b>呼喚</b></div>
+  <div class="call"><button class="bag-launch" type="button" aria-label="背包" aria-haspopup="dialog" aria-controls="inventory"><span class="bag-icon" aria-hidden="true"></span></button><button id="honk" aria-label="喇叭嘴呼喚" title="喇叭嘴呼喚"><span aria-hidden="true">◖</span><i></i></button><b>呼喚</b></div>
   <dialog id="instructions">
     <p class="caption">散步指南</p><h2>一起走吧</h2>
     <p>用 WASD、方向鍵或拖曳雪地移動。在落單動物旁停留一秒，牠就會加入隊伍。</p>
@@ -101,9 +101,11 @@
   </header>
   <div id="territory-view" aria-label="可行走的領地" tabindex="0"><div id="plot" aria-label="建造用地"></div></div>
   <p id="territory-hint" role="status"></p>
+  <button id="building-interact" type="button" hidden>互動 <span>搭乘摩天輪</span></button>
   <div class="territory-actions">
     <button id="rotate-placement" type="button" hidden>旋轉 45°</button>
     <button id="edit-territory" aria-pressed="false">編輯領地</button>
+    <button class="bag-launch" type="button" aria-label="背包" aria-haspopup="dialog" aria-controls="inventory"><span class="bag-icon" aria-hidden="true"></span></button>
     <button id="build-territory" class="territory-icon" aria-label="建設" title="建設"><span aria-hidden="true">＋</span></button>
   </div>
   <dialog id="build-menu" aria-labelledby="build-menu-title">
@@ -131,5 +133,16 @@
   </dialog>
 </main>
 <script type="module" src="/src/main.ts"></script>
+<dialog id="inventory" aria-labelledby="inventory-title">
+  <header><h2 id="inventory-title">背包</h2><form method="dialog"><button aria-label="關閉背包">×</button></form></header>
+  <div id="inventory-categories" aria-label="背包分類"></div>
+  <ul id="inventory-items" aria-label="背包物品"></ul>
+  <p id="inventory-empty">這個分類目前沒有物品。</p>
+  <section id="inventory-details" aria-label="物品資訊" hidden>
+    <h3></h3><p></p>
+    <div class="inventory-tools"><button id="inventory-sell" type="button" aria-label="販售物品" title="販售物品">🗑</button><button id="inventory-use" type="button" hidden>使用</button></div>
+    <div id="inventory-confirm" hidden><p></p><button id="inventory-cancel" type="button">取消</button><button id="inventory-confirm-sell" type="button">確認販售</button></div>
+  </section>
+</dialog>
 </body>
 </html>

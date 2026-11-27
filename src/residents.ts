@@ -2,13 +2,14 @@ import * as T from 'three'
 import { createAnimal } from './animals'
 import type { Penguin, PenguinSave } from './penguin'
 import type { Footprints, Snowfield, SnowParticles } from './snow'
-import { buildingCenter, buildingInfo, buildingKind, isStall, propBlocks, type Building } from './buildings'
+import { buildingCenter, buildingInfo, buildingKind, isStall, propBlocks, WHEEL_PERIOD, WHEEL_SEATS, wheelCabinPosition, type Building } from './buildings'
 import { stallFood } from './decorations'
 
 export const MAX_OUTSIDE_RESIDENTS = 48
 type Rod = {root: T.Group, line: T.Line, bob: T.Mesh}
-type Outing = {animal: Penguin, phase: 'walking' | 'pausing' | 'viewing' | 'playing-in-snow' | 'fishing' | 'drinking' | 'buying' | 'returning' | 'entering',
-  until: number, returnAfter: number, visit?: Building, rod?: Rod, drink?: T.Group, food?: T.Group, turnSide?: number, social?: Social}
+type Outing = {animal: Penguin, phase: 'walking' | 'pausing' | 'viewing' | 'playing-in-snow' | 'fishing' | 'drinking' | 'buying' | 'riding' | 'returning' | 'entering',
+  until: number, returnAfter: number, visit?: Building, rod?: Rod, drink?: T.Group, food?: T.Group, turnSide?: number, social?: Social,
+  ride?: {departure: number, seat: number}}
 type Chase = {leader: Outing, target: T.Vector2, nextTurn: number, nextSwap: number}
 type Social = {pair: [Outing, Outing], until: number, chase?: Chase}
 const detourAngles = [.42, .84, 1.25, 1.62, 2.05, 2.6]
@@ -23,6 +24,11 @@ const waterShape = new T.CylinderGeometry(.028, .016, .24, 8)
 const waterMaterial = new T.MeshStandardMaterial({color: 0x8cdcf4})
 
 export class Residents {
+  playerRide?: {building: Building, seat: number}
+
+  wheelSeatInUse(building: Building, seat: number) {
+    return [...this.roster.values()].some(({outing}) => outing?.visit === building && outing.ride?.seat === seat)
+  }
   private roster = new Map<PenguinSave, Resident>()
   private homes: Building[] = []
   private decorations: Building[] = []
@@ -123,7 +129,7 @@ export class Residents {
     }
     if (outing.phase === 'walking') {
       const runningToSnow = outing.visit?.kind === 'snow-machine' && animal.chick
-      this.walkTo(outing, resident.home, animal.target, runningToSnow ? 2 : 1.15, dt)
+      this.walkTo(outing, animal.target, runningToSnow ? 2 : 1.15, dt)
       const arrived = animal.position.distanceToSquared(animal.target) < .13 ** 2
       if (arrived && outing.visit) {
         const kind = buildingKind(outing.visit)
@@ -131,6 +137,16 @@ export class Residents {
         outing.until = time + (outing.phase === 'fishing' ? 6.5 + Math.random() * 3 : outing.phase === 'drinking' ? 4 : 2 + Math.random() * 2)
         if (outing.phase === 'fishing') this.startFishing(outing)
         if (outing.phase === 'drinking') this.startDrinking(outing, time)
+        if (kind === 'christmas-wheel') {
+          const interval = WHEEL_PERIOD / WHEEL_SEATS
+          let slot = Math.ceil(time / interval)
+          if (this.playerRide?.building === outing.visit &&
+              this.playerRide.seat === (WHEEL_SEATS - slot % WHEEL_SEATS) % WHEEL_SEATS) slot++
+          const departure = slot * interval
+          outing.ride = {departure, seat: (WHEEL_SEATS - slot % WHEEL_SEATS) % WHEEL_SEATS}
+          outing.phase = 'riding'
+          outing.until = departure + WHEEL_PERIOD
+        }
         if (isStall(kind)) {
           outing.phase = 'buying'
           outing.until = time + 4
@@ -162,7 +178,7 @@ export class Residents {
         const angle = Math.atan2(x - center.x * this.tile, y - center.y * this.tile)
         const sway = Math.sin(time * 2 + angle) * .53
         this.waypoint.set(x + Math.cos(angle) * sway, y - Math.sin(angle) * sway)
-        this.walkTo(outing, undefined, this.waypoint, 1.85, dt)
+        this.walkTo(outing, this.waypoint, 1.85, dt)
       } else animal.faceToward(this.waypoint.set(center.x * this.tile, center.y * this.tile), dt)
       if (outing.rod) this.animateRod(outing.rod, time)
       if (outing.drink) this.animateDrink(outing, time)
@@ -182,7 +198,7 @@ export class Residents {
     }
     if (outing.phase === 'returning') {
       this.exit(resident.home)
-      this.walkTo(outing, resident.home, this.door, 1.55, dt)
+      this.walkTo(outing, this.door, 1.55, dt)
       if (animal.position.distanceToSquared(this.door) < .16 ** 2) {
         outing.phase = 'entering'
         outing.until = time + .38
@@ -193,6 +209,23 @@ export class Residents {
         return
       }
       animal.root.scale.setScalar((outing.until - time) / .38)
+    }
+    if (outing.ride && outing.visit) {
+      if (time >= outing.until) {
+        this.clearVisit(outing)
+        outing.phase = 'pausing'
+        outing.until = time + 1.3
+      } else if (time >= outing.ride.departure) {
+        const {x, y} = buildingCenter(outing.visit)
+        const angle = (outing.visit.rotation ?? 0) * Math.PI / 4
+        const cabin = wheelCabinPosition(time, outing.ride.seat)
+        const side = cabin.x
+        animal.animate(dt, time, snow, prints, flakes)
+        animal.showInCabin(x * this.tile + Math.cos(angle) * side + Math.sin(angle) * .23,
+          snow.height(x * this.tile, y * this.tile) + cabin.y - .39,
+          y * this.tile - Math.sin(angle) * side + Math.cos(angle) * .23, angle)
+        return
+      }
     }
     animal.animate(dt, time, snow, prints, flakes)
   }
@@ -215,7 +248,8 @@ export class Residents {
         const center = buildingCenter(item)
         const visitors = [...this.roster.values()].filter(r => r.outing?.visit === item).length
         return (buildingKind(item) !== 'filter' || outing.animal.species === 'penguin') &&
-          (center.x * this.tile - this.door.x) ** 2 + (center.y * this.tile - this.door.y) ** 2 < 12 ** 2 &&
+          (center.x * this.tile - this.door.x) ** 2 + (center.y * this.tile - this.door.y) ** 2 <
+            (item.kind === 'christmas-wheel' ? 26 : 12) ** 2 &&
           visitors < (item.kind === 'christmas-tree' || item.kind === 'snow-machine' ? 3 : 1)
       })
       if (choices.length) {
@@ -225,10 +259,11 @@ export class Residents {
         const z = center.y * this.tile
         const filter = buildingKind(item) === 'filter'
         const stall = isStall(item.kind)
-        const reach = stall ? this.tile + .75 : item.kind === 'snow-machine' ? (outing.animal.chick ? 1.92 : 3.45)
+        const front = filter || stall || item.kind === 'christmas-wheel'
+        const reach = stall || item.kind === 'christmas-wheel' ? this.tile + .75 : item.kind === 'snow-machine' ? (outing.animal.chick ? 1.92 : 3.45)
           : buildingInfo(item).radius * this.tile + (filter ? .45 : .56)
         this.waypoint.set(outing.animal.position.x - x, outing.animal.position.y - z)
-        const bearing = filter || stall ? (item.rotation ?? 0) * Math.PI / 4 : Math.atan2(this.waypoint.x, this.waypoint.y)
+        const bearing = front ? (item.rotation ?? 0) * Math.PI / 4 : Math.atan2(this.waypoint.x, this.waypoint.y)
         for (const offset of filter ? [0] : stall ? [0, .20, -.20] : [0, .8, -.8, 1.6, -1.6, Math.PI]) {
           const px = x + Math.sin(bearing + offset) * reach
           const pz = z + Math.cos(bearing + offset) * reach
@@ -239,7 +274,7 @@ export class Residents {
             (other.animal.target.x - px) ** 2 + (other.animal.target.y - pz) ** 2 < 1.2 ** 2)) continue
           outing.visit = item
           outing.animal.target.set(px, pz)
-          outing.until = time + 14
+          outing.until = time + (item.kind === 'christmas-wheel' ? 34 : 14)
           return
         }
       }
@@ -276,7 +311,7 @@ export class Residents {
     animal.restPose = 'hop'
     if (chase.leader !== outing) {
       if (animal.position.distanceToSquared(other.animal.position) > .85 ** 2) {
-        this.walkTo(outing, undefined, other.animal.position, 2.15, dt)
+        this.walkTo(outing, other.animal.position, 2.15, dt)
       }
       return
     }
@@ -295,7 +330,7 @@ export class Residents {
       }
       chase.nextTurn = time + 1.5
     }
-    this.walkTo(outing, undefined, chase.target, 1.9, dt)
+    this.walkTo(outing, chase.target, 1.9, dt)
   }
 
   private endMeeting({pair}: Social, time: number) {
@@ -307,7 +342,7 @@ export class Residents {
     }
   }
 
-  private walkTo(outing: Outing, home: Building | undefined, target: T.Vector2, speed: number, dt: number) {
+  private walkTo(outing: Outing, target: T.Vector2, speed: number, dt: number) {
     const {animal} = outing
     const {x, y} = animal.position
     const distance = animal.position.distanceTo(target)
@@ -318,7 +353,7 @@ export class Residents {
       this.step.set(x + Math.sin(angle) * length, y + Math.cos(angle) * length)
       const gx = this.step.x / this.tile, gy = this.step.y / this.tile
       return gx >= 0 && gy >= 0 && gx <= this.width && gy <= this.height &&
-        !this.homes.some(other => other !== home && this.inside(other, this.step.x, this.step.y)) &&
+        !this.homes.some(home => propBlocks(home, gx, gy, x / this.tile, y / this.tile)) &&
         !this.decorations.some(item => propBlocks(item, gx, gy, x / this.tile, y / this.tile))
     }
     if (canStep(heading, Math.min(distance, Math.max(stride, .6))) &&
@@ -377,6 +412,8 @@ export class Residents {
   }
 
   private clearVisit(outing: Outing) {
+    if (outing.ride) outing.animal.root.scale.setScalar(1)
+    outing.ride = undefined
     outing.visit = undefined
     outing.animal.restPose = undefined
     outing.food?.removeFromParent()
@@ -395,7 +432,7 @@ export class Residents {
   private exit(home: Building) {
     const angle = this.angle(home)
     const center = buildingCenter(home)
-    const reach = 3.07 * buildingInfo(home).size / 2
+    const reach = 3.07 * buildingInfo(home).size / 2 + .16
     this.door.set(center.x * this.tile + Math.sin(angle) * reach, center.y * this.tile + Math.cos(angle) * reach)
     if (!this.decorations.some(item => propBlocks(item, this.door.x / this.tile, this.door.y / this.tile))) return
     // A decoration can cover the entrance. Use the nearest open spot beside it.
@@ -412,9 +449,7 @@ export class Residents {
   }
 
   private inside(home: Building, x: number, z: number) {
-    const size = buildingInfo(home).size
-    return x / this.tile > home.x - .12 && x / this.tile < home.x + size + .12
-      && z / this.tile > home.y - .12 && z / this.tile < home.y + size + .12
+    return propBlocks(home, x / this.tile, z / this.tile)
   }
 
   private pickTarget(home: Building, animal: Penguin) {

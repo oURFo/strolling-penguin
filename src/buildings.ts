@@ -16,6 +16,7 @@ export const BUILDINGS = {
   fishing: {name: '釣魚池', category: '功能', size: 2, radius: .82, capacity: 0, cost: 20},
   filter: {name: '海水過濾器', category: '功能', size: 1, radius: .39, capacity: 0, cost: 25},
   school: {name: '企鵝學校', category: '功能', size: 3, radius: 1.5, capacity: 0, cost: 100},
+  'christmas-wheel': {name: '聖誕摩天輪', category: '功能', size: 4, depth: 2, radius: 2, capacity: 0, cost: 0},
   'fish-stall': {name: '烤魚攤', category: '功能', size: 1, depth: 2, radius: .94, capacity: 0, cost: 50},
   'ice-stall': {name: '刨冰攤', category: '功能', size: 1, depth: 2, radius: .94, capacity: 0, cost: 50},
 } as const
@@ -23,6 +24,24 @@ export type BuildKind = keyof typeof BUILDINGS
 export type BuildCategory = (typeof BUILDINGS)[BuildKind]['category']
 export type StallKind = 'fish-stall' | 'ice-stall'
 export const isStall = (kind?: BuildKind): kind is StallKind => kind === 'fish-stall' || kind === 'ice-stall'
+export const rotatesOnGrid = (kind?: BuildKind) => isStall(kind) || kind === 'christmas-wheel'
+export const WHEEL_PERIOD = 18
+export const WHEEL_SEATS = 6
+export const WHEEL_RADIUS = 3.65
+export const WHEEL_HEIGHT = 4.35
+
+export function wheelBoardingDistance(building: Building, position: Cell) {
+  const center = buildingCenter(building)
+  const angle = (building.rotation ?? 0) * Math.PI / 4
+  const x = center.x + Math.sin(angle) * 3.1 / TERRITORY_TILE
+  const y = center.y + Math.cos(angle) * 3.1 / TERRITORY_TILE
+  return Math.hypot(position.x - x, position.y - y) * TERRITORY_TILE
+}
+
+export function wheelCabinPosition(time: number, seat: number) {
+  const orbit = (time / WHEEL_PERIOD + seat / WHEEL_SEATS) * Math.PI * 2
+  return {x: Math.sin(orbit) * WHEEL_RADIUS, y: WHEEL_HEIGHT - Math.cos(orbit) * WHEEL_RADIUS}
+}
 export type BuildSubcategory = '一般' | '聖誕節' | '攤販'
 export const BUILD_SUBCATEGORIES: Record<BuildCategory, readonly BuildSubcategory[]> = {
   住宅: ['一般'], 功能: ['一般', '攤販'], 裝飾: ['一般', '聖誕節'],
@@ -30,7 +49,7 @@ export const BUILD_SUBCATEGORIES: Record<BuildCategory, readonly BuildSubcategor
 export const buildingSubcategory = (kind: BuildKind): BuildSubcategory =>
   isStall(kind) ? '攤販' : kind === 'christmas-tree' || kind === 'christmas-gifts' || kind === 'santa-sleigh' || kind === 'snow-machine' ? '聖誕節' : '一般'
 export type Cell = {x: number, y: number}
-export type Building = Cell & {id: number, kind?: BuildKind, rotation?: number, residents: PenguinSave[], stallPaidThrough?: number}
+export type Building = Cell & {id: number, kind?: BuildKind, rotation?: number, residents: PenguinSave[], stallPaidThrough?: number, inventoryItem?: string}
 export const buildingKind = (building: Building): BuildKind => building.kind ?? 'small-igloo'
 export const buildingInfo = (building: Building) => BUILDINGS[buildingKind(building)]
 export function buildingFootprint(kind: BuildKind, rotation = 0) {
@@ -38,19 +57,48 @@ export function buildingFootprint(kind: BuildKind, rotation = 0) {
   const width = info.size, depth = 'depth' in info ? info.depth : width
   return rotation % 4 === 2 ? {width: depth, depth: width} : {width, depth}
 }
-export const propBlocks = (building: Building, x: number, y: number, fromX = x, fromY = y) => {
-  if (isStall(building.kind) || building.kind === 'school') {
-    const {width, depth} = buildingFootprint(building.kind, building.rotation)
-    const penetration = (px: number, py: number) =>
-      Math.min(px - building.x, building.x + width - px, py - building.y, building.y + depth - py)
-    const next = penetration(x, y)
-    return next > -.12 && next >= penetration(fromX, fromY)
+export const TERRITORY_TILE = 3.1
+// Local model units: half width, half depth, then optional forward offset.
+type CollisionPart = readonly [halfWidth: number, halfDepth: number, forward?: number, box?: true]
+const collisionParts: Record<BuildKind, readonly CollisionPart[]> = {
+  'small-igloo': [[2.49, 2.23], [.87, 1.04, 1.78]],
+  'medium-igloo': [[3.66, 3.28], [1.28, 1.53, 2.62]],
+  sign: [[.64, .13, .13, true]], planter: [[.42, .42]],
+  sculpture: [[.69, .56, 0, true]], fountain: [[1.85, 1.38]],
+  'snow-lamp': [[.31, .31]], 'tall-lamp': [[.36, .36]],
+  'christmas-tree': [[1.62, 1.62]], 'christmas-gifts': [[.72, .64, .11, true]],
+  'santa-sleigh': [[.81, 1.45, -.04, true]], 'snow-machine': [[.74, .69, 0, true]],
+  fishing: [[2.48, 1.94]], filter: [[.89, .82, 0, true], [.23, .22, .89]],
+  school: [[3.24, 2.14, 0, true], [.89, .33, 2.42, true]],
+  'fish-stall': [[1.32, 2.53, 0, true]], 'ice-stall': [[1.32, 2.53, 0, true]],
+  'christmas-wheel': [[4.35, 2.15, 0, true]],
+}
+
+export function propBlocks(building: Pick<Building, 'kind' | 'rotation' | 'x' | 'y'>,
+  x: number, y: number, fromX = x, fromY = y) {
+  const kind = building.kind ?? 'small-igloo'
+  const rotation = building.rotation ?? 0
+  const {width, depth} = buildingFootprint(kind, rotation)
+  const cx = building.x + width / 2, cy = building.y + depth / 2
+  const dx = (x - cx) * TERRITORY_TILE, dy = (y - cy) * TERRITORY_TILE
+  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) return false
+  const angle = rotation * Math.PI / 4
+  const cos = Math.cos(angle), sin = Math.sin(angle)
+  const lx = dx * cos - dy * sin, ly = dx * sin + dy * cos
+  const fx = (fromX - cx) * TERRITORY_TILE, fy = (fromY - cy) * TERRITORY_TILE
+  const previousX = fx * cos - fy * sin, previousY = fx * sin + fy * cos
+  const margin = .20
+  for (const [halfWidth, halfDepth, forward = 0, box] of collisionParts[kind]) {
+    const distance = (px: number, py: number) => {
+      const u = Math.abs(px) / (halfWidth + margin)
+      const v = Math.abs(py - forward) / (halfDepth + margin)
+      return box ? Math.max(u, v) : u * u + v * v
+    }
+    const next = distance(lx, ly)
+    // Allow an animal already inside a collider to move outward.
+    if (next < 1 && next <= distance(previousX, previousY)) return true
   }
-  const {radius} = buildingInfo(building)
-  const {x: cx, y: cy} = buildingCenter(building)
-  const distance = (x - cx) ** 2 + (y - cy) ** 2
-  // An object can be moved onto an animal. Allow it to walk back out.
-  return distance < (radius + .12) ** 2 && distance <= (fromX - cx) ** 2 + (fromY - cy) ** 2
+  return false
 }
 export const buildingCenter = (building: Building) => {
   const {width, depth} = buildingFootprint(buildingKind(building), building.rotation)

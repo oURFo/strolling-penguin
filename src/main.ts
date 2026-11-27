@@ -9,6 +9,7 @@ import { setupMail } from './mail'
 import { setupSaveSettings } from './save-settings'
 import { recordEventLogin, setupEvents, type CheckIns } from './events'
 import { setupChat } from './chat'
+import { setupInventory } from './inventory'
 import type { Penguin } from './penguin'
 import './style.css'
 
@@ -178,6 +179,9 @@ function boot() {
     id => !readStroll()?.claimedMail?.includes(id) && saveStroll(), pauseGameInput)
   const saveDialog = setupSaveSettings(pauseGameInput)
   const chatDialog = setupChat(pauseGameInput)
+  const inventoryDialog = setupInventory(pauseGameInput, id => territoryState.itemCount(id),
+    () => !territoryPage.hidden, id => territory.useInventoryItem(id), id => territory.sellInventoryItem(id),
+    id => territory.inventoryThumbnail(id))
   if (recordEventLogin(checkIns)) saveStroll()
   const {dialog: eventsDialog, refresh: refreshEvents} = setupEvents(pauseGameInput, checkIns, amount => territory.addCoins(amount, false), saveStroll)
   window.addEventListener('pageshow', event => {
@@ -248,7 +252,7 @@ function boot() {
     help.showModal()
   })
   window.addEventListener('keydown', e => {
-    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open || eventsDialog.open || chatDialog.open ||
+    if (game.hidden || !controls.has(e.code) || help.open || mailbox.open || saveDialog.open || eventsDialog.open || chatDialog.open || inventoryDialog.open ||
         e.target === cameraDistance || e.ctrlKey || e.altKey || e.metaKey) return
     if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return
     e.preventDefault()
