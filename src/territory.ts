@@ -231,7 +231,7 @@ export class Territory {
     private storeMember: (member: Penguin) => PenguinSave | undefined,
     private returnMember: (saved: PenguinSave) => void, private save: () => void,
     private renderer: WebGLRenderer, private player: Penguin,
-    private activateAudio: () => void, private stepAudio: () => void) {
+    private activateAudio: () => void, private stepAudio: () => void, private visiting = false) {
     this.enableMovement()
     this.interact.onclick = () => {
       const wheel = this.nearbyWheel()
@@ -323,6 +323,10 @@ export class Territory {
     return this.world.buildingThumbnail(ITEMS[item].building)
   }
 
+  capture() {
+    if (!this.page.hidden) return this.world?.capture()
+  }
+
   close() {
     this.keys.clear()
     this.drag = undefined
@@ -400,7 +404,7 @@ export class Territory {
 
   private menuOpen() {
     return this.buildMenu.open || this.roster.open || element<HTMLDialogElement>('inventory').open ||
-      element<HTMLDialogElement>('instructions').open
+      element<HTMLDialogElement>('instructions').open || element<HTMLDialogElement>('territory-share').open
   }
 
   private get placementKind(): BuildKind | undefined {
@@ -595,7 +599,9 @@ export class Territory {
     this.hint.textContent = info ? footprint && footprint.width ? `選擇${info.name}左上角，需要 ${footprint.width} × ${footprint.depth} 格。` : `選擇${info.name}的位置，可與建物重疊。`
       : this.editing ? '點建物或裝飾可移動、旋轉或回收。'
       : this.state.houses.length ? '用方向鍵、WASD 或拖曳散步。點兩下雪屋管理住戶。' : '可在領地散步，或點右下角「建設」放置雪屋。'
+    if (this.visiting) this.hint.textContent = '正在參觀分享的領地，可自由散步、旋轉鏡頭及縮放。'
     for (const house of this.state.houses) {
+      if (this.visiting) break
       if (placing) break
       const node = document.createElement('button')
       const info = buildingInfo(house)

@@ -112,11 +112,27 @@
   <p id="territory-hint" role="status"></p>
   <button id="building-interact" type="button" hidden>互動 <span>搭乘摩天輪</span></button>
   <div class="territory-actions">
+    <button id="share-territory" type="button" aria-haspopup="dialog" aria-controls="territory-share">分享領地</button>
     <button id="rotate-placement" type="button" hidden>旋轉 45°</button>
     <button id="edit-territory" aria-pressed="false">編輯領地</button>
     <button class="bag-launch" type="button" aria-label="背包" aria-haspopup="dialog" aria-controls="inventory"><span class="bag-icon" aria-hidden="true"></span></button>
     <button id="build-territory" class="territory-icon" aria-label="建設" title="建設"><span aria-hidden="true">＋</span></button>
   </div>
+  <dialog id="territory-share" aria-labelledby="territory-share-title">
+    <header>
+      <h2 id="territory-share-title">分享領地</h2>
+      <form method="dialog"><button aria-label="關閉分享領地">×</button></form>
+    </header>
+    <p>掃描 QR 碼或開啟網址，就能到你分享的領地散步。</p>
+    <canvas id="territory-share-qr" aria-label="領地分享 QR 碼" role="img" hidden></canvas>
+    <label for="territory-share-url">領地分享網址</label>
+    <div class="territory-share-link">
+      <input id="territory-share-url" type="url" readonly>
+      <button id="copy-territory-url" type="button" disabled>複製</button>
+    </div>
+    <p id="territory-share-status" role="status"></p>
+    <button id="download-territory-image" type="button" disabled>下載分享圖片</button>
+  </dialog>
   <dialog id="build-menu" aria-labelledby="build-menu-title">
     <header class="build-header">
       <h2 id="build-menu-title">建築選單</h2>

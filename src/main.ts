@@ -10,6 +10,7 @@ import { setupSaveSettings } from './save-settings'
 import { recordEventLogin, setupEvents, type CheckIns } from './events'
 import { setupChat } from './chat'
 import { setupInventory } from './inventory'
+import { readTerritoryVisit, setupTerritoryShare } from './territory-share'
 import { ITEMS } from './items'
 import type { Penguin } from './penguin'
 import './style.css'
@@ -60,7 +61,14 @@ function activateAudio() {
   syncAudioButton()
 }
 
-function boot() {
+async function boot() {
+  let visit: Awaited<ReturnType<typeof readTerritoryVisit>>
+  let invalidVisit = false
+  try {
+    visit = await readTerritoryVisit(location.hash)
+  } catch {
+    invalidVisit = true
+  }
   const scene = new T.Scene()
   scene.background = new T.Color(0xd9e8f6)
   scene.fog = new T.FogExp2(0xd9e8f6, .020)
@@ -122,7 +130,7 @@ function boot() {
     colonies = new Colonies(scene, snow, particles, notify)
   }
   const player = colonies.player
-  const territoryState = new TerritoryState(saved?.territory)
+  const territoryState = new TerritoryState(visit ?? saved?.territory)
   const claimedMail = new Set(Array.isArray(saved?.claimedMail) ? saved.claimedMail : [])
   const checkIns: CheckIns = saved?.eventCheckIns ?? {}
   let savedCheckIns = JSON.stringify(checkIns)
@@ -131,6 +139,7 @@ function boot() {
   let chestRewardTimer: number | undefined
   let nextSave = time + 3
   function saveStroll() {
+    if (visit) return false
     const {x, y: z} = player.position
     const state: StrollSave = {
       version: 1, time, offset: snow.offset.toArray(), colonies: colonies.snapshot(),
@@ -163,8 +172,9 @@ function boot() {
   const loading = get('territory-loading')
   const territory = new Territory(territoryState, () => colonies.party.members,
     member => colonies.storeMember(member), member => colonies.releaseMember(member, time), saveStroll,
-    renderer, player, activateAudio, () => audio.step())
-  const settleStallIncome = () => territory.settleStallIncome()
+    renderer, player, activateAudio, () => audio.step(), !!visit)
+  setupTerritoryShare(() => territoryState.houses, () => territory.capture())
+  const settleStallIncome = () => { if (!visit) territory.settleStallIncome() }
   settleStallIncome()
   window.setInterval(settleStallIncome, 1000)
   function saveOnLeave() {
@@ -213,6 +223,7 @@ function boot() {
   const {dialog: eventsDialog, refresh: refreshEvents} = setupEvents(pauseGameInput, checkIns, amount => territory.addCoins(amount, false), saveStroll)
   let checkInTimer: number
   function refreshDailyCheckIn() {
+    if (visit) return
     window.clearTimeout(checkInTimer)
     const now = Date.now()
     // Taiwan uses UTC+8 year-round.
@@ -252,6 +263,11 @@ function boot() {
     }, 480)
   }
   get('return-snow').onclick = () => {
+    if (visit) {
+      history.replaceState(null, '', location.pathname + location.search)
+      location.reload()
+      return
+    }
     territoryPage.hidden = true
     territory.close()
     game.hidden = false
@@ -433,10 +449,18 @@ function boot() {
   let previous = performance.now()
   snow.update(player.position.x, player.position.y)
   updateCamera(0)
-  if (!saved) {
+  if (visit) {
+    game.hidden = true
+    territoryPage.classList.add('territory-visit')
+    territoryPage.querySelector('h1')!.textContent = '參觀企鵝領地'
+    territoryPage.hidden = false
+    territory.open()
+    get('return-snow').focus()
+  } else if (!saved && !invalidVisit) {
     renderer.render(scene, camera)
     showGuide('snow', true)
   }
+  if (invalidVisit) notify('無法開啟這個領地分享網址。')
   renderer.setAnimationLoop(now => {
     const dt = Math.min(.045, Math.max(.001, (now - previous) / 1000))
     previous = now
@@ -523,10 +547,8 @@ function boot() {
   })
 }
 
-try {
-  boot()
-} catch (error) {
+void boot().catch(error => {
   console.error(error)
   hint.textContent = '無法啟動 3D 雪原。請確認瀏覽器已啟用 WebGL 2。'
   button.disabled = true
-}
+})

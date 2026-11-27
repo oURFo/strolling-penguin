@@ -131,7 +131,7 @@
   align-items: center;
   gap: 10px;
 }
-#edit-territory, #rotate-placement, .igloo-controls button, .roster-columns button {
+#share-territory, #edit-territory, #rotate-placement, .igloo-controls button, .roster-columns button {
   padding: 7px 13px;
   border: 1px solid #c3dce8;
   border-radius: 18px;
@@ -947,4 +947,43 @@
 @media (max-width: 480px) {
   .treasure-promo { grid-template-columns: 1fr; }
   .treasure-promo-art { width: min(240px, 100%); margin-inline: auto; }
+}
+.territory-visit .territory-actions, .territory-visit .wallet, .territory-visit #territory-help { display: none; }
+.territory-visit .territory-header h1 { white-space: normal; }
+#territory-share { width: min(460px, calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: clamp(15px, 4vw, 24px); }
+#territory-share header, .territory-share-link { display: flex; align-items: center; gap: 8px; }
+#territory-share header { justify-content: space-between; }
+#territory-share h2 { font-size: 27px; }
+#territory-share label { display: block; font-size: .83rem; font-weight: 800; }
+#territory-share-qr {
+  position: static;
+  display: block;
+  width: min(220px, 85%);
+  height: auto;
+  margin: 8px auto 14px;
+  image-rendering: pixelated;
+  touch-action: auto;
+}
+#territory-share-qr[hidden] { display: none; }
+.territory-share-link input {
+  min-width: 0;
+  flex: 1;
+  padding: 9px;
+  border: 1px solid #abcbdc;
+  border-radius: 9px;
+  color: #21445d;
+  background: #fff;
+}
+#territory-share > button, .territory-share-link button {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 13px;
+  color: white;
+  background: #24566f;
+}
+#territory-share button:disabled { opacity: .55; cursor: default; }
+#download-territory-image { width: 100%; }
+#territory-share-status { min-height: 1.5em; margin: 7px 0; font-size: .83rem; }
+@media (max-width: 480px) {
+  #share-territory { white-space: nowrap; font-size: .79rem; }
 }

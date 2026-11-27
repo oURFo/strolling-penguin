@@ -345,6 +345,17 @@ export class TerritoryWorld {
     this.avatar.root.scale.setScalar(1)
   }
 
+  capture() {
+    const source = this.renderer.domElement
+    if (!source.width || !source.height) return
+    const photo = document.createElement('canvas')
+    photo.width = source.width
+    photo.height = source.height
+    this.renderer.render(this.scene, this.camera)
+    photo.getContext('2d')?.drawImage(source, 0, 0)
+    return photo
+  }
+
   render(view: HTMLElement, position: PlotCell, dx: number, dy: number, dt: number, zoom: number, angle: number) {
     const w = view.clientWidth, h = view.clientHeight
     if (w < 1 || h < 1) return false
