@@ -205,13 +205,32 @@ function boot() {
   const inventoryDialog = setupInventory(pauseGameInput, id => territoryState.itemCount(id),
     () => !territoryPage.hidden, id => territory.useInventoryItem(id), id => territory.sellInventoryItem(id),
     id => territory.inventoryThumbnail(id))
-  if (recordEventLogin(checkIns)) saveStroll()
   const {dialog: eventsDialog, refresh: refreshEvents} = setupEvents(pauseGameInput, checkIns, amount => territory.addCoins(amount, false), saveStroll)
-  window.addEventListener('pageshow', event => {
-    if (event.persisted && recordEventLogin(checkIns)) {
-      saveStroll()
-      refreshEvents()
+  let checkInTimer: number
+  function refreshDailyCheckIn() {
+    window.clearTimeout(checkInTimer)
+    const now = Date.now()
+    // Taiwan uses UTC+8 year-round.
+    const day = 24 * 60 * 60 * 1000
+    const taiwanOffset = 8 * 60 * 60 * 1000
+    const nextMidnight = day - (now + taiwanOffset) % day
+    checkInTimer = window.setTimeout(refreshDailyCheckIn, nextMidnight)
+    const previous = readStroll()?.eventCheckIns ?? {}
+    if (JSON.stringify(previous) !== savedCheckIns) {
+      for (const id of Object.keys(checkIns)) delete checkIns[id]
+      Object.assign(checkIns, previous)
+      savedCheckIns = JSON.stringify(checkIns)
     }
+    if (recordEventLogin(checkIns) && !saveStroll()) {
+      for (const id of Object.keys(checkIns)) delete checkIns[id]
+      Object.assign(checkIns, JSON.parse(savedCheckIns) as CheckIns)
+    }
+    refreshEvents()
+  }
+  refreshDailyCheckIn()
+  window.addEventListener('pageshow', refreshDailyCheckIn)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshDailyCheckIn()
   })
   get('open-territory').onclick = () => {
     keys.clear()
