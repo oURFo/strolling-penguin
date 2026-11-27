@@ -1,7 +1,7 @@
-import {BUILDINGS, type BuildKind} from './buildings'
+import {BUILDINGS, type BuildKind, type CHRISTMAS_STARS} from './buildings.ts'
 
 type BuildingItem = {category: '建築', name: string, description: string, sellPrice: number, building: BuildKind}
-function christmasStar(building: keyof typeof import('./buildings').CHRISTMAS_STARS): BuildingItem {
+function christmasStar(building: keyof typeof CHRISTMAS_STARS): BuildingItem {
   return {
     category: '建築', name: BUILDINGS[building].name, sellPrice: 5, building,
     description: '從雪地寶箱找到的浮空星星，入夜會發光。可在企鵝領地自由放置與旋轉，回收時會返還背包。',

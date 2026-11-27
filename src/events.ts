@@ -5,9 +5,10 @@ type CheckInEvent = {
   rewards: readonly number[]
 }
 
-const events: readonly CheckInEvent[] = [
+const checkInEvents: readonly CheckInEvent[] = [
   {id: 'snow-check-in', type: 'check-in', title: '企鵝 7 天簽到', rewards: [30, 30, 30, 50, 50, 70, 100]},
 ]
+const events = [...checkInEvents, {id: 'christmas-treasure', type: 'promo', title: '聖誕寶箱'} as const]
 
 type CheckIn = {days: number, lastDay: string, claimed: number[], completedDay?: string}
 export type CheckIns = Record<string, CheckIn>
@@ -15,7 +16,7 @@ const dayClock = new Intl.DateTimeFormat('sv-SE', {timeZone: 'Asia/Taipei', year
 
 export function recordEventLogin(book: CheckIns, today = dayClock.format()) {
   let changed = false
-  for (const event of events) {
+  for (const event of checkInEvents) {
     const previous = book[event.id]
     if (previous && (today <= previous.lastDay ||
       (previous.completedDay ? today <= previous.completedDay : previous.days >= event.rewards.length))) continue
@@ -32,7 +33,7 @@ export function recordEventLogin(book: CheckIns, today = dayClock.format()) {
 export function claimCheckIn(book: CheckIns, id: string, day: number,
   credit: (amount: number) => void, save: () => boolean, today = dayClock.format()) {
   const previous = book[id]
-  const reward = events.find(event => event.id === id)?.rewards
+  const reward = checkInEvents.find(event => event.id === id)?.rewards
   if (!previous || !reward || !Number.isInteger(day) || day < 1 || day > previous.days ||
       day > reward.length || previous.claimed.includes(day)) return false
   const claimed = [...previous.claimed, day]
@@ -91,8 +92,6 @@ function renderCheckIn(event: CheckInEvent, progress: CheckIn | undefined, onCla
   return schedule
 }
 
-const layouts = {'check-in': renderCheckIn}
-
 export function setupEvents(pauseInput: () => void, book: CheckIns, credit: (amount: number) => void, save: () => boolean) {
   const launch = document.querySelector<HTMLButtonElement>('#open-events')!
   const dot = launch.querySelector<HTMLElement>('.event-dot')!
@@ -100,6 +99,7 @@ export function setupEvents(pauseInput: () => void, book: CheckIns, credit: (amo
   const tabs = document.querySelector<HTMLElement>('#event-tabs')!
   const panel = document.querySelector<HTMLElement>('#event-panel')!
   const status = document.querySelector<HTMLElement>('#event-status')!
+  const treasureBanner = document.querySelector<HTMLTemplateElement>('#christmas-treasure-banner')!
   let active = 0
   const buttons = events.map((event, index) => {
     const button = document.createElement('button')
@@ -112,7 +112,7 @@ export function setupEvents(pauseInput: () => void, book: CheckIns, credit: (amo
     return button
   })
   function select(index: number) {
-    const available = events.some(event => {
+    const available = checkInEvents.some(event => {
       const progress = book[event.id]
       return progress && event.rewards.some((_, index) => index < progress.days && !progress.claimed.includes(index + 1))
     })
@@ -126,7 +126,11 @@ export function setupEvents(pauseInput: () => void, book: CheckIns, credit: (amo
     panel.setAttribute('aria-labelledby', buttons[active].id)
     const event = events[active]
     status.textContent = ''
-    panel.replaceChildren(layouts[event.type](event, book[event.id], day => {
+    if (event.type === 'promo') {
+      panel.replaceChildren(treasureBanner.content.cloneNode(true))
+      return
+    }
+    panel.replaceChildren(renderCheckIn(event, book[event.id], day => {
       if (!claimCheckIn(book, event.id, day, credit, save)) {
         status.textContent = '領取結果未能儲存，請重新整理後再試。'
         return
