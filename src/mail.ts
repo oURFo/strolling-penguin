@@ -1,7 +1,11 @@
 import schedule from './mail-schedule.json'
+import { ITEMS, type ItemId } from './items'
 
+export type MailReward = {kind: 'penguin-coins', amount: number} | {kind: 'inventory-item', item: ItemId, amount: number}
 type Letter = {id: string, triggerAt: string, expiresAt?: string, title: string, body: string,
-  reward: {kind: 'penguin-coins', amount: number}}
+  reward: MailReward}
+
+const rewardName = (reward: MailReward) => reward.kind === 'penguin-coins' ? '企鵝金幣' : ITEMS[reward.item].name
 
 const canClaim = (letter: Letter, now: number) =>
   Date.parse(letter.triggerAt) <= now && (!letter.expiresAt || now < Date.parse(letter.expiresAt))
@@ -11,17 +15,17 @@ export function availableLetters(letters: readonly Letter[], claimed: ReadonlySe
 }
 
 export function claimLetter(letter: Letter, claimed: Set<string>,
-  credit: (amount: number) => void, save: (id: string) => boolean, now = Date.now()) {
+  credit: (reward: MailReward, amount: number) => void, save: (id: string) => boolean, now = Date.now()) {
   if (claimed.has(letter.id) || !canClaim(letter, now)) return false
   claimed.add(letter.id)
-  credit(letter.reward.amount)
+  credit(letter.reward, letter.reward.amount)
   if (save(letter.id)) return true
-  credit(-letter.reward.amount)
+  credit(letter.reward, -letter.reward.amount)
   claimed.delete(letter.id)
   return false
 }
 
-export function setupMail(claimed: Set<string>, credit: (amount: number) => void,
+export function setupMail(claimed: Set<string>, credit: (reward: MailReward, amount: number) => void,
   save: (id: string) => boolean, pauseInput: () => void) {
   const letters = schedule as Letter[]
   const get = <E extends HTMLElement>(id: string) => document.getElementById(id) as E
@@ -76,7 +80,8 @@ export function setupMail(claimed: Set<string>, credit: (amount: number) => void
       deadline.textContent = `領取期限　${date.format(Date.parse(selected.expiresAt) - 1)} 以前（台灣時間）`
     }
     get('mail-body').textContent = selected.body
-    get('mail-reward-label').textContent = `企鵝金幣 × ${selected.reward.amount}`
+    get('mail-reward').querySelector<HTMLElement>('.penguin-coin')!.hidden = selected.reward.kind !== 'penguin-coins'
+    get('mail-reward-label').textContent = `${rewardName(selected.reward)} × ${selected.reward.amount}`
   }
 
   toggle.onclick = () => {
@@ -115,7 +120,7 @@ export function setupMail(claimed: Set<string>, credit: (amount: number) => void
       status.textContent = '無法儲存領取結果。若已在其他分頁領取，請重新整理。'
       return
     }
-    status.textContent = '已領取企鵝金幣。'
+    status.textContent = `已領取${rewardName(selected.reward)}。`
     render()
     const nextButton = list.querySelector('button') ?? dialog.querySelector('header button')
     nextButton?.focus()

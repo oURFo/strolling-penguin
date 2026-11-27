@@ -175,7 +175,10 @@ function boot() {
     keys.clear()
     resetDrag()
   }
-  const mailbox = setupMail(claimedMail, amount => territory.addCoins(amount, false),
+  const mailbox = setupMail(claimedMail, (reward, amount) => {
+    if (reward.kind === 'penguin-coins') territory.addCoins(amount, false)
+    else territoryState.inventory[reward.item] = territoryState.itemCount(reward.item) + amount
+  },
     id => !readStroll()?.claimedMail?.includes(id) && saveStroll(), pauseGameInput)
   const saveDialog = setupSaveSettings(pauseGameInput)
   const chatDialog = setupChat(pauseGameInput)

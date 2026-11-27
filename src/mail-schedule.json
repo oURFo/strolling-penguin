@@ -9,5 +9,17 @@
       "amount": 100,
       "kind": "penguin-coins"
     }
+  },
+  {
+    "expiresAt": "2026-11-30T00:00:00+08:00",
+    "id": "weekend-cheer-2026-11-27",
+    "title": "周末小開心",
+    "reward": {
+      "kind": "inventory-item",
+      "item": "christmas-wheel",
+      "amount": 1
+    },
+    "body": "其實就只是想要發信",
+    "triggerAt": "2026-11-27T14:30:00+08:00"
   }
 ]
