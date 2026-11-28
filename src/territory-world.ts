@@ -415,11 +415,12 @@ export class TerritoryWorld {
   }
 
   portrait(saved: PenguinSave, leader: boolean) {
-    const key = `${saved.species ?? 'penguin'}:${saved.seed}:${leader}`
+    const key = `${saved.species ?? 'penguin'}:${saved.seed}:${saved.style ?? 0}:${leader}`
     const cached = this.portraits.get(key)
     if (cached) return cached
     const scene = this.thumbnailScene()
     const animal = createAnimal(scene, 0, 0, 'follow', leader, saved.seed, saved.species)
+    if (saved.style !== undefined) animal.wearStyle(saved.style)
     try {
       const url = this.renderThumbnail(scene, animal.root, new T.Vector3(4.1, 2.1, 6.3), 104, .48)
       this.portraits.set(key, url)

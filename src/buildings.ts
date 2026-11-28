@@ -30,6 +30,7 @@ export const BUILDINGS = {
   fishing: {name: '釣魚池', category: '功能', size: 2, radius: .82, capacity: 0, cost: 20},
   filter: {name: '海水過濾器', category: '功能', size: 1, radius: .39, capacity: 0, cost: 25},
   school: {name: '企鵝學校', category: '功能', size: 3, radius: 1.5, capacity: 0, cost: 100},
+  laboratory: {name: '企鵝實驗室', category: '功能', size: 3, radius: 1.5, capacity: 0, cost: 150},
   'christmas-wheel': {name: '聖誕摩天輪', category: '功能', size: 4, depth: 2, radius: 2, capacity: 0, cost: 0},
   'fish-stall': {name: '烤魚攤', category: '功能', size: 1, depth: 2, radius: .94, capacity: 0, cost: 50},
   'ice-stall': {name: '刨冰攤', category: '功能', size: 1, depth: 2, radius: .94, capacity: 0, cost: 50},
@@ -88,6 +89,7 @@ const collisionParts: Record<BuildKind, readonly CollisionPart[]> = {
   'santa-sleigh': [[.81, 1.45, -.04, true]], 'snow-machine': [[.74, .69, 0, true]],
   fishing: [[2.48, 1.94]], filter: [[.89, .82, 0, true], [.23, .22, .89]],
   school: [[3.24, 2.14, 0, true], [.89, .33, 2.42, true]],
+  laboratory: [[2.95, 2.35, 0, true]],
   'fish-stall': [[1.32, 2.53, 0, true]], 'ice-stall': [[1.32, 2.53, 0, true]],
   'christmas-wheel': [[4.35, 2.15, 0, true]],
 }

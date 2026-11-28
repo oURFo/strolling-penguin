@@ -172,7 +172,8 @@ async function boot() {
   const loading = get('territory-loading')
   const territory = new Territory(territoryState, () => colonies.party.members,
     member => colonies.storeMember(member), member => colonies.releaseMember(member, time), saveStroll,
-    renderer, player, activateAudio, () => audio.step(), !!visit)
+    renderer, player, activateAudio, () => audio.step(),
+    (selected, style) => colonies.research(selected, style, time, saveStroll), !!visit)
   setupTerritoryShare(() => territoryState.houses, () => territory.capture())
   const settleStallIncome = () => { if (!visit) territory.settleStallIncome() }
   settleStallIncome()

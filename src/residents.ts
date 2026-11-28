@@ -98,6 +98,7 @@ export class Residents {
 
   private start(saved: PenguinSave, resident: Resident, time: number) {
     const animal = createAnimal(this.scene, this.door.x, this.door.y, 'solo', false, saved.seed, saved.species)
+    if (saved.style !== undefined) animal.wearStyle(saved.style)
     animal.angle = this.angle(resident.home)
     const outing: Outing = {animal, phase: 'walking', until: time + 5, returnAfter: time + 8 + Math.random() * 11}
     resident.outing = outing

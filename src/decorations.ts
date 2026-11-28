@@ -349,6 +349,28 @@ function christmasWheel(group: T.Group) {
   animateDecoration(group, 0)
 }
 
+function penguinLaboratory(group: T.Group) {
+  part(group, cube, machine, 0, .20, 0, 5.8, .40, 4.6)
+  part(group, cube, pale, 0, .43, 0, 5.5, .17, 4.35)
+  part(group, round, machine, 0, 2.47, -.12, 1.98, 2.13, 1.72)
+  part(group, round, lightIce, 0, 2.20, 1.22, 1.35, 1.46, .49)
+  part(group, round, machine, 0, 4.15, -.02, 1.51, 1.35, 1.39)
+  part(group, cube, deep, 0, 4.32, 1.29, 2.43, .59, .27)
+  part(group, cube, festiveGold, 0, 3.73, 1.47, .66, .23, .47)
+  for (const side of [-1, 1]) {
+    part(group, round, machine, side * 2.13, 2.55, -.16, .44, 1.27, .58).rotation.z = side * .32
+    part(group, cube, machine, side * 1.18, .68, 1.12, 1.19, .36, 1.36)
+    part(group, cube, bulbs[1], side * .62, 4.34, 1.444, .45, .20, .045)
+    part(group, cube, bulbs[3], side * .90, 1.38, 1.83, .095, .74, .077)
+  }
+  part(group, cube, deep, 0, 1.39, 1.80, 1.60, 1.75, .30)
+  part(group, cube, ice, 0, 1.36, 1.98, 1.26, 1.49, .10)
+  part(group, cube, bulbs[1], 0, 1.31, 2.04, .045, 1.35, .04)
+  part(group, cube, pale, 0, .54, 2.04, 1.73, .16, .51)
+  part(group, cube, machine, .48, 5.47, -.17, .095, .64, .095)
+  part(group, round, bulbs[1], .48, 5.81, -.17, .15, .15, .15)
+}
+
 export function decorationModel(kind: BuildKind) {
   const group = new T.Group()
   if (isChristmasStar(kind)) {
@@ -368,6 +390,8 @@ export function decorationModel(kind: BuildKind) {
     stallModel(group, kind)
   } else if (kind === 'school') {
     penguinSchool(group)
+  } else if (kind === 'laboratory') {
+    penguinLaboratory(group)
   } else if (kind === 'snow-lamp' || kind === 'tall-lamp') {
     pathLamp(group, kind === 'tall-lamp')
   } else if (kind === 'sign') {

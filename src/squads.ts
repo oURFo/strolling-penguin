@@ -158,6 +158,7 @@ export class Colonies {
   releaseMember(saved: PenguinSave, time: number) {
     const tail = this.party.members[this.party.members.length - 1]
     const member = this.add(tail.position.x, tail.position.y, 'follow', false, saved.seed, saved.species)
+    if (saved.style !== undefined) member.wearStyle(saved.style)
     const gap = tail.formationRadius + member.formationRadius + .61
     member.position.set(tail.position.x - Math.sin(tail.angle) * gap, tail.position.y - Math.cos(tail.angle) * gap)
     member.target.copy(member.position)
@@ -166,6 +167,22 @@ export class Colonies {
     member.protectedUntil = time + 5
     this.party.members.push(member)
     return member
+  }
+
+  research(selected: ReadonlySet<Penguin>, style: number, time: number, save: () => boolean) {
+    const party = this.party.members
+    if (selected.size !== 5 || selected.has(this.player) || [...selected].some(member => !party.includes(member))) return
+    const original = [...party]
+    party.splice(0, party.length, ...original.filter(member => !selected.has(member)))
+    for (const member of selected) this.penguins.delete(member)
+    const result = this.releaseMember({...this.player.snapshot(), seed: Math.floor(Math.random() * 0x100000000), style}, time)
+    if (save()) {
+      for (const member of selected) member.dispose(this.scene)
+      return result
+    }
+    this.remove(result)
+    for (const member of selected) this.penguins.add(member)
+    party.splice(0, party.length, ...original)
   }
 
   private squad(x: number, z: number, followers: number) {

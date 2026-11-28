@@ -1,10 +1,12 @@
 import * as T from 'three'
 import { type Snowfield, type SnowParticles, type Footprints, random, SEA_LEVEL, softDot } from './snow'
+import { dressPenguin, stylePose, PENGUIN_STYLES } from './penguin-styles'
 
 export type Status = 'solo' | 'leader' | 'follow' | 'trip' | 'dream' | 'stray'
 export type RestPose = 'tumble' | 'dream' | 'hop' | 'chat' | 'fish' | 'drink' | 'look-up'
 export type PenguinSave = {
   species?: Penguin['species']
+  style?: number
   seed: number
   position: [number, number]
   target: [number, number]
@@ -100,6 +102,16 @@ export class Penguin {
   private shoreHeight = 0
   private diveDepth = 0
   private nextStroke = 0
+  private outfit?: ReturnType<typeof dressPenguin>
+  private outfitStrength = 0
+  private style?: number
+
+  wearStyle(id: number, persist = true) {
+    const style = Number.isInteger(id) ? PENGUIN_STYLES[id - 1] : undefined
+    if (!style || this.species !== 'penguin' || this.outfit) return
+    this.outfit = dressPenguin(style, this.head, this.body)
+    if (persist) this.style = id
+  }
 
   constructor(scene: T.Scene, x: number, z: number, status: Status, player = false,
     protected seed = Math.floor(Math.random() * 0x100000000), readonly species: 'penguin' | 'seal' | 'mammoth' | 'saber-tooth' = 'penguin') {
@@ -153,14 +165,15 @@ export class Penguin {
 
   snapshot(): PenguinSave {
     return {
-      species: this.species, seed: this.seed, position: this.position.toArray(), target: this.target.toArray(),
+      species: this.species, style: this.style, seed: this.seed, position: this.position.toArray(), target: this.target.toArray(),
       route: this.route.map(point => point.toArray()), status: this.status, angle: this.angle, phase: this.phase,
       recruit: this.recruit, joy: this.joy, slide: this.slide, nextTurn: this.nextTurn,
       protectedUntil: this.protectedUntil, distance: this.distance, side: this.side,
     }
   }
 
-  restore({target, route, angle, phase, recruit, joy, slide, nextTurn, protectedUntil, distance, side}: PenguinSave) {
+  restore({target, route, angle, phase, recruit, joy, slide, nextTurn, protectedUntil, distance, side, style}: PenguinSave) {
+    if (style !== undefined) this.wearStyle(style)
     this.target.fromArray(target)
     this.route = route.map(point => new T.Vector2().fromArray(point))
     Object.assign(this, {angle, phase, recruit, joy, slide, nextTurn, protectedUntil, distance, side})
@@ -240,6 +253,17 @@ export class Penguin {
     this.gait = T.MathUtils.lerp(this.gait, walk, blend)
     this.phase = (this.phase + this.speed * dt * Math.PI / stride) % TAU
     const idle = !moving && !stumble && !dream && this.honk === 0
+    let outfitPose: ReturnType<typeof stylePose> | undefined
+    if (this.outfit) {
+      const {prop, height, motion} = this.outfit
+      const cycle = (time + this.idleSeed) % 6.5
+      const strength = idle && !water && !this.restPose ? Math.sin(Math.PI * Math.min(1, cycle / 2.8)) : 0
+      this.outfitStrength = T.MathUtils.lerp(this.outfitStrength, strength, blend)
+      outfitPose = stylePose(motion, time * motion.rate + this.idleSeed, this.outfitStrength)
+      prop.position.y = height + outfitPose.lift
+      prop.rotation.z = outfitPose.swing
+      prop.visible = this.restPose !== 'fish' && this.restPose !== 'drink'
+    }
     const breath = Math.sin(time * 2.8 + this.idleSeed)
     if (idle) {
       this.idleLookIn -= dt
@@ -267,7 +291,7 @@ export class Penguin {
     const crossing = 1 - this.shoreTime / .58
     const y = T.MathUtils.lerp(this.shoreHeight, mediumHeight, T.MathUtils.smoothstep(crossing, 0, 1))
       + Math.sin(crossing * Math.PI) * (water ? .45 : .56)
-    this.root.position.set(x, y + recoveryHop + (water ? bounce * .25 : bounce), z)
+    this.root.position.set(x, y + recoveryHop + (water ? bounce * .25 : bounce + (outfitPose?.hop ?? 0)), z)
     const groundNormal = water ? up : snow.slope(x, z, slope)
     this.root.quaternion.setFromUnitVectors(up, groundNormal)
       .multiply(heading.setFromAxisAngle(up, this.angle))
@@ -276,12 +300,12 @@ export class Penguin {
     this.shadow.quaternion.setFromUnitVectors(up, groundNormal)
     if (this.species !== 'penguin') this.shadow.quaternion.multiply(heading)
     const sway = Math.sin(this.phase) * this.gait
-    this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0))
+    this.body.rotation.set(this.tilt, 0, sway * .17 + (idle ? breath * .022 : 0) + (outfitPose?.lean ?? 0))
     const pitch = this.honk > 0 ? -.24 : water ? -.47 + Math.sin(this.phase) * .09 : this.restPose === 'fish' ? .18 + Math.sin(time * 2) * .07 : this.restPose === 'drink' ? .20 : dream ? -.22 + Math.sin(time * 2) * .13
       : this.restPose === 'look-up' ? -.38 : chatting ? Math.sin(time * 8 + this.idleSeed) * .13 : idle ? this.idlePitch : -.035
     const yaw = dream ? Math.sin(time * 2.1) * .45 : idle && !chatting ? this.idleYaw : 0
-    this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0), blend)
-    this.head.rotation.y = T.MathUtils.lerp(this.head.rotation.y, yaw, blend * .65)
+    this.head.rotation.x = T.MathUtils.lerp(this.head.rotation.x, pitch + (idle ? breath * .035 : 0) + (outfitPose?.pitch ?? 0), blend)
+    this.head.rotation.y = T.MathUtils.lerp(this.head.rotation.y, yaw + (outfitPose?.yaw ?? 0), blend * .65)
     this.head.rotation.z = T.MathUtils.lerp(this.head.rotation.z, idle ? yaw * -.11 : -sway * .07, blend)
     if (this.beak) this.beak.visible = this.honk === 0
     this.trumpet.visible = this.honk > 0
@@ -301,7 +325,8 @@ export class Penguin {
       if (this.restPose === 'fish' && i === 1) this.wings[i].rotation.x = -.80 + Math.sin(time * 3) * .12
       if (this.restPose === 'drink' && i === 1) this.wings[i].rotation.x = -1.18
       const playFlap = water ? .25 + paddle * .48 : this.restPose === 'hop' ? .31 + Math.sin(time * 15) * .24 : 0
-      this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : sway * .2 + playFlap + (idle ? breath * .035 : 0)))
+      const idleFlap = (idle ? breath * .035 : 0) + (outfitPose?.wing ?? 0) * (i ? 1 : .65)
+      this.wings[i].rotation.z = (i ? 1 : -1) * (.23 + (stumble ? Math.sin(time * 22) * .49 : sway * .2 + playFlap + idleFlap))
     })
     if (water) {
       if (moving && time >= this.nextStroke) {

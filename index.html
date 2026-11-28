@@ -113,6 +113,18 @@
     <button id="building-interact" type="button" hidden>互動 <span>搭乘摩天輪</span></button>
   </div>
   <p id="territory-hint" role="status"></p>
+  <dialog id="penguin-research" aria-labelledby="research-title">
+    <h2 id="research-title">企鵝實驗室</h2>
+    <div class="research-machine" aria-hidden="true"><div class="research-capsule"></div></div>
+    <div id="research-result" hidden></div>
+    <p id="research-status" role="status">選擇 5 位夥伴。</p>
+    <ul id="research-team" aria-label="隊伍夥伴"></ul>
+    <details><summary>研究機率</summary><ul id="research-rates"></ul></details>
+    <div class="research-actions">
+      <form method="dialog"><button id="close-research">關閉</button></form>
+      <button id="start-research" type="button" disabled>研究</button>
+    </div>
+  </dialog>
   <div class="territory-actions">
     <button id="share-territory" type="button" aria-haspopup="dialog" aria-controls="territory-share">分享領地</button>
     <button id="edit-residents" type="button" aria-haspopup="dialog" aria-controls="igloo-roster" disabled>編輯住民</button>

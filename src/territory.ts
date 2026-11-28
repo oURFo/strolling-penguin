@@ -3,8 +3,9 @@ import type { WebGLRenderer } from 'three'
 import { TerritoryWorld, TERRITORY_TILE } from './territory-world'
 import { bindCameraZoom } from './camera-zoom'
 import { ITEMS, type ItemId } from './items'
+import { setupResearch } from './research'
 import { BUILDINGS, BUILD_SUBCATEGORIES, buildingFootprint, buildingInfo, buildingKind, buildingSubcategory, isStall, isInventoryBuilding, rotatesOnGrid, propBlocks, wheelBoardingDistance,
-  type Building, type BuildCategory, type BuildKind, type BuildSubcategory, type Cell, type StallKind } from './buildings'
+  buildingCenter, type Building, type BuildCategory, type BuildKind, type BuildSubcategory, type Cell, type StallKind } from './buildings'
 
 export const TERRITORY_WIDTH = 30
 export const TERRITORY_HEIGHT = 24
@@ -232,9 +233,15 @@ export class Territory {
     private storeMember: (member: Penguin) => PenguinSave | undefined,
     private returnMember: (saved: PenguinSave) => void, private save: () => void,
     private renderer: WebGLRenderer, private player: Penguin,
-    private activateAudio: () => void, private stepAudio: () => void, private visiting = false) {
+    private activateAudio: () => void, private stepAudio: () => void,
+    exchange: (selected: ReadonlySet<Penguin>, style: number) => Penguin | undefined, private visiting = false) {
+    this.research = setupResearch(team, (member, leader) => this.world?.portrait(member.snapshot(), leader) ?? '', exchange)
     this.enableMovement()
     this.interact.onclick = () => {
+      if (this.nearbyLaboratory()) {
+        this.research.open()
+        return
+      }
       const wheel = this.nearbyWheel()
       if (!wheel || !this.world?.boardWheel(wheel)) return
       this.interact.hidden = true
@@ -311,6 +318,8 @@ export class Territory {
     }
     this.updateCoins()
   }
+
+  private research: ReturnType<typeof setupResearch>
 
   open() {
     this.state.enterAtCenter()
@@ -409,7 +418,8 @@ export class Territory {
 
   private menuOpen() {
     return this.buildMenu.open || this.roster.open || element<HTMLDialogElement>('inventory').open ||
-      element<HTMLDialogElement>('instructions').open || element<HTMLDialogElement>('territory-share').open
+      element<HTMLDialogElement>('instructions').open || element<HTMLDialogElement>('territory-share').open ||
+      this.research.dialog.open
   }
 
   private get placementKind(): BuildKind | undefined {
@@ -432,6 +442,18 @@ export class Territory {
       distance = gap
     }
     return nearest
+  }
+
+  private nearbyLaboratory() {
+    if (this.visiting || this.editing || this.placement || this.menuOpen() || this.world?.riding) return false
+    const {x, y} = this.state.position
+    return this.state.houses.some(house => {
+      if (house.kind !== 'laboratory') return false
+      const center = buildingCenter(house)
+      const angle = (house.rotation ?? 0) * Math.PI / 4
+      return Math.hypot((x - center.x) * TERRITORY_TILE - Math.sin(angle) * 3.25,
+        (y - center.y) * TERRITORY_TILE - Math.cos(angle) * 3.25) <= 1.85
+    })
   }
 
   private stopRide() {
@@ -463,7 +485,10 @@ export class Territory {
         (dy * Math.cos(angle) - dx * Math.sin(angle)) * dt * pace)
     }
     if (!this.world) return
-    this.interact.hidden = !this.nearbyWheel()
+    const researchNearby = this.nearbyLaboratory()
+    this.interact.hidden = !researchNearby && !this.nearbyWheel()
+    const actionLabel = researchNearby ? '研究' : '互動 · 搭乘摩天輪'
+    if (this.interact.textContent !== actionLabel) this.interact.textContent = actionLabel
     if (this.world.render(this.view, position, position.x - x, position.y - y, dt, this.zoom.scale, angle)) this.stepAudio()
     for (const [house, spot] of this.spots) {
       const point = this.world.project(house)
