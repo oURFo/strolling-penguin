@@ -131,7 +131,7 @@
   align-items: center;
   gap: 10px;
 }
-#share-territory, #edit-territory, #rotate-placement, .igloo-controls button, .roster-columns button {
+#share-territory, #edit-residents, #edit-territory, #rotate-placement, .igloo-controls button, .roster-columns button {
   padding: 7px 13px;
   border: 1px solid #c3dce8;
   border-radius: 18px;
@@ -184,6 +184,9 @@
 }
 #igloo-roster h2 { margin-bottom: 15px; font-family: Georgia,"Noto Serif TC","PMingLiU",serif; }
 #igloo-roster form button { background: #c9e6f5; color: #234e67; border: 1px solid #effaff; }
+.roster-house-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin-bottom: 8px; font-size: .78rem; }
+.roster-house-switch button { margin-left: auto; white-space: nowrap; }
+.roster-house-switch button:disabled, #edit-residents:disabled { opacity: .55; cursor: default; }
 .roster-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(7px, 2vw, 16px); }
 .roster-panel {
   min-width: 0;
@@ -985,5 +988,6 @@
 #download-territory-image { width: 100%; }
 #territory-share-status { min-height: 1.5em; margin: 7px 0; font-size: .83rem; }
 @media (max-width: 480px) {
-  #share-territory { white-space: nowrap; font-size: .79rem; }
+  .territory-actions { max-width: calc(100% - 28px); flex-wrap: wrap; justify-content: flex-end; }
+  #share-territory, #edit-residents { white-space: nowrap; font-size: .79rem; padding-inline: 8px; }
 }

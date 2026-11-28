@@ -219,6 +219,7 @@ export class Territory {
     }
   }, {root: this.roster})
   private editButton = element<HTMLButtonElement>('edit-territory')
+  private residentsButton = element<HTMLButtonElement>('edit-residents')
   private editing = false
   private placement?: BuildKind | Building
   private placementItem?: ItemId
@@ -256,6 +257,10 @@ export class Territory {
       try { localStorage.setItem(angleKey, this.cameraAngle.value) } catch { /* Continue without storage. */ }
     })
     this.roster.addEventListener('close', () => this.portraitObserver.disconnect())
+    this.residentsButton.onclick = () => {
+      const first = this.residentialBuildings()[0]
+      if (first) this.showRoster(first)
+    }
     element('build-territory').onclick = () => {
       this.showCatalog()
       this.buildMenu.showModal()
@@ -584,6 +589,7 @@ export class Territory {
 
   private render() {
     const placing = this.placement !== undefined
+    this.residentsButton.disabled = placing || this.editing || !this.residentialBuildings().length
     const kind = this.placementKind
     if (placing || this.editing) this.world?.leaveWheel()
     const info = kind && BUILDINGS[kind]
@@ -626,9 +632,19 @@ export class Territory {
     this.updateCoins()
   }
 
+  private residentialBuildings() {
+    return this.state.houses.filter(house => buildingInfo(house).capacity > 0).sort((a, b) => a.id - b.id)
+  }
+
   private showRoster(house: Building) {
     const info = buildingInfo(house)
-    this.roster.querySelector('h2')!.textContent = info.name
+    const homes = this.residentialBuildings()
+    const index = homes.indexOf(house)
+    const next = element<HTMLButtonElement>('next-igloo')
+    next.disabled = homes.length < 2
+    next.onclick = () => this.showRoster(homes[(index + 1) % homes.length])
+    element('igloo-roster-title').textContent = info.name
+    element('igloo-house-number').textContent = `第 ${index + 1} / ${homes.length} 間`
     element('igloo-hint').textContent = '領隊會留在隊伍中。'
     const render = () => {
       const residents = element('igloo-residents')

@@ -113,6 +113,7 @@
   <button id="building-interact" type="button" hidden>互動 <span>搭乘摩天輪</span></button>
   <div class="territory-actions">
     <button id="share-territory" type="button" aria-haspopup="dialog" aria-controls="territory-share">分享領地</button>
+    <button id="edit-residents" type="button" aria-haspopup="dialog" aria-controls="igloo-roster" disabled>編輯住民</button>
     <button id="rotate-placement" type="button" hidden>旋轉 45°</button>
     <button id="edit-territory" aria-pressed="false">編輯領地</button>
     <button class="bag-launch" type="button" aria-label="背包" aria-haspopup="dialog" aria-controls="inventory"><span class="bag-icon" aria-hidden="true"></span></button>
@@ -147,11 +148,18 @@
     <div class="igloo-controls"><button id="move-igloo">移動雪屋</button><button id="rotate-igloo">旋轉 45°</button><button id="recycle-igloo">回收 · 還 10 金幣</button></div>
     <form method="dialog"><button>關閉</button></form>
   </dialog>
-  <dialog id="igloo-roster">
-    <h2>小型雪屋</h2>
+  <dialog id="igloo-roster" aria-labelledby="igloo-roster-title">
+    <h2 id="igloo-roster-title">小型雪屋</h2>
     <div class="roster-columns">
       <section class="roster-panel"><h3>目前隊伍 <small id="igloo-team-count"></small></h3><ul id="igloo-team"></ul></section>
-      <section class="roster-panel"><h3>雪屋住戶 <small id="igloo-capacity"></small></h3><ul id="igloo-residents"></ul></section>
+      <section class="roster-panel">
+        <h3>雪屋住戶 <small id="igloo-capacity"></small></h3>
+        <div class="roster-house-switch" aria-label="切換雪屋">
+          <span id="igloo-house-number" role="status"></span>
+          <button id="next-igloo" type="button">下一間</button>
+        </div>
+        <ul id="igloo-residents"></ul>
+      </section>
     </div>
     <p id="igloo-hint" role="status"></p>
     <form method="dialog"><button>關閉</button></form>
