@@ -371,6 +371,66 @@ function penguinLaboratory(group: T.Group) {
   part(group, round, bulbs[1], .48, 5.81, -.17, .15, .15, .15)
 }
 
+const otterBeam = new T.CylinderGeometry(.32, .07, 1, 16, 1, true)
+const otterBeamMaterial = new T.MeshBasicMaterial({
+  color: 0xffd392, transparent: true, opacity: .08, depthWrite: false,
+  blending: T.AdditiveBlending, side: T.DoubleSide,
+})
+
+export type StatueSpotlights = {lenses: T.Mesh[], target: T.Object3D}
+
+function otterStatue(group: T.Group) {
+  part(group, round, ice, 0, .26, 0, 2.43, .26, 2.08)
+  part(group, round, pale, 0, .48, 0, 2.26, .17, 1.9)
+  part(group, round, lightIce, 0, .59, 0, 1.39, .07, 1.53)
+  part(group, round, ice, -.15, .85, -1.14, .27, .23, .76).rotation.y = .48
+  part(group, round, ice, 0, 1.03, -.26, .76, .55, 1.16)
+  part(group, round, lightIce, 0, 1.45, -.19, .55, .26, .79)
+  const head = new T.Group()
+  head.position.set(0, 1.30, .80)
+  head.rotation.x = -Math.PI / 2
+  head.rotateZ(Math.PI)
+  group.add(head)
+  part(head, round, ice, 0, 0, 0, .62, .59, .60)
+  part(group, round, orange, 0, 1.16, .46, .68, .49, .15)
+  part(group, round, orange, -.38, 1.58, .28, .20, .11, .16)
+  part(group, round, orange, -.49, 1.47, .10, .13, .055, .30).rotation.y = -.27
+  for (const side of [-1, 1]) {
+    part(head, round, ice, side * .49, .23, 0, .19, .25, .17)
+    part(head, round, deep, side * .49, .26, .12, .11, .16, .065)
+    part(head, round, pale, side * .17, -.03, .47, .24, .17, .18)
+    part(head, round, deep, side * .22, .19, .49, .052, .060, .040)
+    part(group, round, ice, side * .55, 1.48, -.07, .18, .20, .43).rotation.y = side * -.61
+    part(group, round, ice, side * .40, 1.04, -.94, .23, .20, .46).rotation.y = side * .59
+    for (let i = 0; i < 2; i++) {
+      part(head, cube, deep, side * .34, -.06 - i * .06, .59, .16, .016, .018).rotation.z = side * (.15 - i * .32)
+    }
+  }
+  part(head, round, deep, 0, .03, .635, .13, .08, .062)
+  part(group, round, pale, 0, 1.69, .11, .30, .12, .27)
+  for (const angle of [-.60, -.30, 0, .30, .60]) {
+    const rib = part(group, round, lightIce, Math.sin(angle) * .14, 1.76, .12, .027, .035, .21)
+    rib.rotation.y = angle
+  }
+  const target = new T.Object3D()
+  target.position.set(0, 1.79, .20)
+  group.add(target)
+  const lenses = [-1, 1].map(side => {
+    const fixture = new T.Group()
+    fixture.position.set(side * 1.10, .61, .66)
+    const direction = target.position.clone().sub(fixture.position)
+    const length = direction.length()
+    fixture.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), direction.normalize())
+    group.add(fixture)
+    part(group, tankCylinder, machine, fixture.position.x, .58, fixture.position.z, .27, .10, .24)
+    part(fixture, tankCylinder, machine, 0, .12, 0, .19, .28, .19)
+    const lens = part(fixture, tankCylinder, lampGlow, 0, .28, 0, .151, .045, .151)
+    part(fixture, otterBeam, otterBeamMaterial, 0, (.31 + length) / 2, 0, 1, length - .31, 1)
+    return lens
+  })
+  group.userData.statueSpotlights = {lenses, target} satisfies StatueSpotlights
+}
+
 export function decorationModel(kind: BuildKind) {
   const group = new T.Group()
   if (isChristmasStar(kind)) {
@@ -407,6 +467,8 @@ export function decorationModel(kind: BuildKind) {
       part(group, round, pink, side * .15, .84, .04, .124, .12, .10)
     }
     part(group, round, pink, .02, 1.01, 0, .135, .13, .12)
+  } else if (kind === 'otter-statue') {
+    otterStatue(group)
   } else if (kind === 'sculpture') {
     part(group, cube, pale, 0, .13, 0, 1.37, .24, 1.12)
     part(group, pebble, ice, 0, .76, 0, .52, .58, .4)

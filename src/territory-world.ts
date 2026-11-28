@@ -5,7 +5,7 @@ import { createAnimal } from './animals'
 import { Footprints, Snowfield, SnowParticles } from './snow'
 import { Residents } from './residents'
 import { BUILDINGS, buildingCenter, buildingFootprint, buildingInfo, buildingKind, TERRITORY_TILE, WHEEL_SEATS, wheelCabinPosition, type BuildKind, type Building } from './buildings'
-import { animateDecoration, decorationModel, lightPathLamp } from './decorations'
+import { animateDecoration, decorationModel, lightPathLamp, type StatueSpotlights } from './decorations'
 
 export { TERRITORY_TILE } from './buildings'
 const WALK = 3.45 * .75
@@ -81,6 +81,7 @@ export class TerritoryWorld {
   private ambient = new T.HemisphereLight()
   private sun = new T.DirectionalLight()
   private lampLights = Array.from({length: 6}, () => new T.PointLight(0xffca83, 0, 8))
+  private statueLights = Array.from({length: 4}, () => new T.SpotLight(0xffd492, 0, 4, Math.PI / 6, .65))
   private night = 0
   private nightTarget = 0
   private clockSecond = -1
@@ -118,6 +119,10 @@ export class TerritoryWorld {
     for (const light of this.lampLights) {
       light.visible = false
       this.scene.add(light)
+    }
+    for (const light of this.statueLights) {
+      light.visible = false
+      this.scene.add(light, light.target)
     }
     this.avatar = new Penguin(this.scene, 0, 0, 'leader', true, player.snapshot().seed)
     this.residents = new Residents(this.scene, TERRITORY_TILE, width, height)
@@ -173,10 +178,13 @@ export class TerritoryWorld {
 
   private updatePathLamps(x: number, z: number) {
     const nearby = []
+    const statues: {lights: StatueSpotlights, delta: number}[] = []
     for (const model of this.houses.values()) {
+      const delta = (model.position.x - x) ** 2 + (model.position.z - z) ** 2
+      const lights = model.userData.statueSpotlights as StatueSpotlights | undefined
+      if (lights) statues.push({lights, delta})
       const lamp = lightPathLamp(model, this.night)
       if (!lamp || this.night === 0) continue
-      const delta = (model.position.x - x) ** 2 + (model.position.z - z) ** 2
       nearby.push({model, lamp, delta})
     }
     nearby.sort((a, b) => a.delta - b.delta)
@@ -188,6 +196,15 @@ export class TerritoryWorld {
       light.position.y += source.lamp.height
       light.distance = source.lamp.range
       light.intensity = source.lamp.intensity * this.night
+    }
+    statues.sort((a, b) => a.delta - b.delta)
+    for (const [index, light] of this.statueLights.entries()) {
+      const source = statues[Math.floor(index / 2)]?.lights
+      light.visible = !!source
+      if (!source) continue
+      source.lenses[index % 2].getWorldPosition(light.position)
+      source.target.getWorldPosition(light.target.position)
+      light.intensity = 8 + this.night * 8
     }
   }
 

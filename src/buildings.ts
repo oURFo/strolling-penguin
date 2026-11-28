@@ -8,7 +8,7 @@ export const CHRISTMAS_STARS = {
 } as const
 export const isChristmasStar = (kind: string): kind is keyof typeof CHRISTMAS_STARS =>
   Object.hasOwn(CHRISTMAS_STARS, kind)
-export const isInventoryBuilding = (kind: BuildKind) => kind === 'christmas-wheel' || isChristmasStar(kind)
+export const isInventoryBuilding = (kind: BuildKind) => kind === 'christmas-wheel' || kind === 'otter-statue' || isChristmasStar(kind)
 
 export const BUILDINGS = {
   'christmas-star-red': {name: '聖誕星星（紅）', category: '裝飾', size: 0, radius: 0, capacity: 0, cost: 0},
@@ -20,6 +20,7 @@ export const BUILDINGS = {
   sign: {name: '告示牌', category: '裝飾', size: 0, radius: .25, capacity: 0, cost: 3},
   planter: {name: '小花盆', category: '裝飾', size: 0, radius: .24, capacity: 0, cost: 3},
   sculpture: {name: '冰塊雕像', category: '裝飾', size: 0, radius: .37, capacity: 0, cost: 5},
+  'otter-statue': {name: '水瀨雕像', category: '裝飾', size: 2, radius: 1, capacity: 0, cost: 0},
   fountain: {name: '噴冰塊池', category: '裝飾', size: 0, radius: .63, capacity: 0, cost: 20},
   'snow-lamp': {name: '雪地燈', category: '裝飾', size: 0, radius: .23, capacity: 0, cost: 5},
   'tall-lamp': {name: '高路燈', category: '裝飾', size: 0, radius: .27, capacity: 0, cost: 6},
@@ -84,6 +85,7 @@ const collisionParts: Record<BuildKind, readonly CollisionPart[]> = {
   'medium-igloo': [[3.66, 3.28], [1.28, 1.53, 2.62]],
   sign: [[.64, .13, .13, true]], planter: [[.42, .42]],
   sculpture: [[.69, .56, 0, true]], fountain: [[1.85, 1.38]],
+  'otter-statue': [[2.43, 2.08]],
   'snow-lamp': [[.31, .31]], 'tall-lamp': [[.36, .36]],
   'christmas-tree': [[1.62, 1.62]], 'christmas-gifts': [[.72, .64, .11, true]],
   'santa-sleigh': [[.81, 1.45, -.04, true]], 'snow-machine': [[.74, .69, 0, true]],

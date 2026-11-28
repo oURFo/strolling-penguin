@@ -8,6 +8,10 @@ function christmasStar(building: keyof typeof CHRISTMAS_STARS): BuildingItem {
   }
 }
 export const ITEMS = {
+  'otter-statue': {
+    category: '建築', name: BUILDINGS['otter-statue'].name, sellPrice: 10, building: 'otter-statue',
+    description: '一隻仰躺在冰面上、抱著貝殼的水瀨雕像。可在企鵝領地使用，佔地 2×2 格。放置時消耗一件，回收後返還背包。',
+  },
   'christmas-star-red': christmasStar('christmas-star-red'),
   'christmas-star-green': christmasStar('christmas-star-green'),
   'christmas-star-blue': christmasStar('christmas-star-blue'),
