@@ -171,7 +171,8 @@ export class Colonies {
 
   research(selected: ReadonlySet<Penguin>, style: number, time: number, save: () => boolean) {
     const party = this.party.members
-    if (selected.size !== 5 || selected.has(this.player) || [...selected].some(member => !party.includes(member))) return
+    if (selected.size !== 5 || selected.has(this.player) ||
+        [...selected].some(member => member.species !== 'penguin' || !party.includes(member))) return
     const original = [...party]
     party.splice(0, party.length, ...original.filter(member => !selected.has(member)))
     for (const member of selected) this.penguins.delete(member)

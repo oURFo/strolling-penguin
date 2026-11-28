@@ -16,6 +16,7 @@ export type TerritorySave = {coins: number, houses: Building[], position?: Cell,
 const speciesNames = {penguin: '企鵝', seal: '海豹', mammoth: '長毛象', 'saber-tooth': '劍齒虎'}
 const clampWalk = (value: number, maximum: number) => Math.max(.39, Math.min(maximum - .39, value))
 const turn = (rotation = 0, kind?: BuildKind) => (rotation + (rotatesOnGrid(kind) ? 2 : 1)) % 8
+const earnsHourlyCoins = (kind?: BuildKind) => isStall(kind) || kind === 'laboratory'
 
 export class TerritoryState {
   readonly pondGrid = true
@@ -120,7 +121,7 @@ export class TerritoryState {
       if (this.coins < cost) return false
       const id = 1 + this.houses.reduce((max, house) => Math.max(max, house.id), 0)
       const building: Building = {...cell, id, kind, rotation, residents: [], inventoryItem: item}
-      if (isStall(kind)) building.stallPaidThrough = Date.now()
+      if (earnsHourlyCoins(kind)) building.stallPaidThrough = Date.now()
       this.houses.push(building)
       this.coins -= cost
       if (item) this.inventory[item] = this.itemCount(item) - 1
@@ -173,7 +174,7 @@ export class TerritoryState {
   settleStallIncome(now = Date.now()) {
     let income = 0
     for (const stall of this.houses) {
-      if (!isStall(stall.kind)) continue
+      if (!earnsHourlyCoins(stall.kind)) continue
       const paidThrough = stall.stallPaidThrough
       if (paidThrough === undefined || !Number.isSafeInteger(paidThrough) || paidThrough <= 0) {
         stall.stallPaidThrough = now
@@ -513,7 +514,7 @@ export class Territory {
   }
 
   private updateCoins() {
-    const income = this.state.houses.filter(house => isStall(house.kind)).length
+    const income = this.state.houses.filter(house => earnsHourlyCoins(house.kind)).length
     for (const scene of ['snow', 'territory']) {
       element(scene + '-coins').textContent = String(this.state.coins)
       element(scene + '-income').textContent = `每小時 +${income} 金幣`

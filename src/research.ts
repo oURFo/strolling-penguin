@@ -12,11 +12,11 @@ export function setupResearch(team: () => Penguin[], portrait: (member: Penguin,
   const rates = dialog.querySelector('#research-rates')!
   const selected = new Set<Penguin>()
   const options = new Map<Penguin, HTMLButtonElement>()
-  const names = {penguin: '企鵝', seal: '海豹', mammoth: '長毛象', 'saber-tooth': '劍齒虎'}
+  const candidates = () => team().slice(1).filter(member => member.species === 'penguin')
   let working = false
 
   function label(member: Penguin) {
-    return PENGUIN_STYLES[(member.snapshot().style ?? 0) - 1]?.name ?? names[member.species]
+    return PENGUIN_STYLES[(member.snapshot().style ?? 0) - 1]?.name ?? '企鵝'
   }
 
   for (const tier of RESEARCH_RARITIES) {
@@ -42,7 +42,7 @@ export function setupResearch(team: () => Penguin[], portrait: (member: Penguin,
   function renderTeam() {
     list.replaceChildren()
     options.clear()
-    for (const [index, member] of team().slice(1).entries()) {
+    for (const [index, member] of candidates().entries()) {
       const row = document.createElement('li')
       const button = document.createElement('button')
       const image = new Image()
@@ -57,7 +57,7 @@ export function setupResearch(team: () => Penguin[], portrait: (member: Penguin,
         if (selected.has(member)) selected.delete(member)
         else if (selected.size < 5) selected.add(member)
         result.hidden = true
-        status.textContent = `已選 ${selected.size} / 5 位夥伴。研究完成後，選中的 5 位會離隊。`
+        status.textContent = `已選 ${selected.size} / 5 隻企鵝。研究完成後，選中的企鵝會離隊。`
         updateSelection()
       }
       row.append(button)
@@ -104,8 +104,8 @@ export function setupResearch(team: () => Penguin[], portrait: (member: Penguin,
     open() {
       selected.clear()
       result.hidden = true
-      status.textContent = team().length < 6 ? '需要 5 位隊伍夥伴才能研究。領隊會留在隊伍。'
-        : '選擇 5 位夥伴。研究完成後，選中的 5 位會離隊，並有一隻新企鵝加入。'
+      status.textContent = candidates().length < 5 ? '隊伍中需要 5 隻可供研究的企鵝。領隊會留在隊伍。'
+        : '選擇 5 隻企鵝。研究完成後，選中的企鵝會離隊，並有一隻新企鵝加入。'
       renderTeam()
       dialog.showModal()
     },
