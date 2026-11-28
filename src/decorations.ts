@@ -383,37 +383,32 @@ function otterStatue(group: T.Group) {
   part(group, round, ice, 0, .26, 0, 2.43, .26, 2.08)
   part(group, round, pale, 0, .48, 0, 2.26, .17, 1.9)
   part(group, round, lightIce, 0, .59, 0, 1.39, .07, 1.53)
-  part(group, round, ice, -.15, .85, -1.14, .27, .23, .76).rotation.y = .48
-  part(group, round, ice, 0, 1.03, -.26, .76, .55, 1.16)
-  part(group, round, lightIce, 0, 1.45, -.19, .55, .26, .79)
+  part(group, round, ice, -.34, .76, -.88, .24, .16, .91).rotation.y = .44
+  part(group, round, ice, -.66, .72, -1.52, .12, .096, .40).rotation.y = .60
+  part(group, round, ice, 0, 1.53, -.12, .55, 1.00, .49).rotation.x = .12
+  part(group, round, lightIce, 0, 1.52, .268, .37, .754, .186).rotation.x = .12
   const head = new T.Group()
-  head.position.set(0, 1.30, .80)
-  head.rotation.x = -Math.PI / 2
-  head.rotateZ(Math.PI)
+  head.position.set(0, 2.65, .07)
+  head.rotation.x = -.09
   group.add(head)
-  part(head, round, ice, 0, 0, 0, .62, .59, .60)
-  part(group, round, orange, 0, 1.16, .46, .68, .49, .15)
-  part(group, round, orange, -.38, 1.58, .28, .20, .11, .16)
-  part(group, round, orange, -.49, 1.47, .10, .13, .055, .30).rotation.y = -.27
+  part(head, round, ice, 0, 0, 0, .51, .408, .43)
+  part(group, round, orange, 0, 2.24, .05, .456, .127, .427)
+  part(group, round, orange, -.27, 2.22, .37, .137, .105, .111)
+  part(group, cube, orange, -.32, 1.99, .39, .185, .41, .065).rotation.z = -.18
   for (const side of [-1, 1]) {
-    part(head, round, ice, side * .49, .23, 0, .19, .25, .17)
-    part(head, round, deep, side * .49, .26, .12, .11, .16, .065)
-    part(head, round, pale, side * .17, -.03, .47, .24, .17, .18)
-    part(head, round, deep, side * .22, .19, .49, .052, .060, .040)
-    part(group, round, ice, side * .55, 1.48, -.07, .18, .20, .43).rotation.y = side * -.61
-    part(group, round, ice, side * .40, 1.04, -.94, .23, .20, .46).rotation.y = side * .59
+    part(head, round, ice, side * .425, .179, -.075, .124, .142, .095)
+    part(head, round, deep, side * .447, .19, -.008, .078, .085, .035)
+    part(head, round, pale, side * .126, -.13, .344, .179, .112, .139)
+    part(head, round, deep, side * .202, .034, .382, .045, .046, .029)
+    part(group, round, ice, side * .41, 1.62, .262, .135, .433, .157).rotation.z = -side * .27
+    part(group, round, ice, side * .342, .73, .28, .218, .149, .39).rotation.y = side * .13
     for (let i = 0; i < 2; i++) {
-      part(head, cube, deep, side * .34, -.06 - i * .06, .59, .16, .016, .018).rotation.z = side * (.15 - i * .32)
+      part(head, cube, deep, side * .244, -.133 - i * .037, .454, .144, .012, .015).rotation.z = side * (.13 - i * .32)
     }
   }
-  part(head, round, deep, 0, .03, .635, .13, .08, .062)
-  part(group, round, pale, 0, 1.69, .11, .30, .12, .27)
-  for (const angle of [-.60, -.30, 0, .30, .60]) {
-    const rib = part(group, round, lightIce, Math.sin(angle) * .14, 1.76, .12, .027, .035, .21)
-    rib.rotation.y = angle
-  }
+  part(head, round, deep, 0, -.079, .478, .101, .055, .055)
   const target = new T.Object3D()
-  target.position.set(0, 1.79, .20)
+  target.position.set(0, 1.78, .37)
   group.add(target)
   const lenses = [-1, 1].map(side => {
     const fixture = new T.Group()
