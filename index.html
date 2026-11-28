@@ -108,9 +108,11 @@
       <div class="wallet" aria-label="企鵝金幣"><div class="wallet-balance"><span class="penguin-coin" aria-hidden="true"></span><strong id="territory-coins">0</strong></div><small id="territory-income">每小時 +0 金幣</small></div>
     </div>
   </header>
-  <div id="territory-view" aria-label="可行走的領地" tabindex="0"><div id="plot" aria-label="建造用地"></div></div>
+  <div id="territory-view" aria-label="可行走的領地" tabindex="0">
+    <div id="plot" aria-label="建造用地"></div>
+    <button id="building-interact" type="button" hidden>互動 <span>搭乘摩天輪</span></button>
+  </div>
   <p id="territory-hint" role="status"></p>
-  <button id="building-interact" type="button" hidden>互動 <span>搭乘摩天輪</span></button>
   <div class="territory-actions">
     <button id="share-territory" type="button" aria-haspopup="dialog" aria-controls="territory-share">分享領地</button>
     <button id="edit-residents" type="button" aria-haspopup="dialog" aria-controls="igloo-roster" disabled>編輯住民</button>

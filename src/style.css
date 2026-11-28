@@ -987,7 +987,16 @@
 #territory-share button:disabled { opacity: .55; cursor: default; }
 #download-territory-image { width: 100%; }
 #territory-share-status { min-height: 1.5em; margin: 7px 0; font-size: .83rem; }
-@media (max-width: 480px) {
-  .territory-actions { max-width: calc(100% - 28px); flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 600px) {
+  #territory { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+  #territory-hint { margin: 12px 14px 7px; font-size: .8rem; }
+  .territory-actions {
+    position: static;
+    width: 100%;
+    padding: 0 14px max(10px, env(safe-area-inset-bottom));
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  #building-interact { position: absolute; bottom: 12px; }
   #share-territory, #edit-residents { white-space: nowrap; font-size: .79rem; padding-inline: 8px; }
 }
